@@ -12,6 +12,64 @@ const $$ = (sel, ctx = document) => [...ctx.querySelectorAll(sel)];
 const getLS = (key, def) => JSON.parse(localStorage.getItem(key) || JSON.stringify(def));
 const setLS = (key, val) => localStorage.setItem(key, JSON.stringify(val));
 
+/**
+ * 🌶️ CLOUD SYNC ENGINE (Supabase)
+ */
+const CLOUD_ENABLED = (typeof supabase !== 'undefined' && supabase !== null);
+
+// Helper to get all data from a cloud collection
+async function syncCloudToLocal() {
+  if (!CLOUD_ENABLED) return;
+  console.log("🌦️ Syncing Cloud to Local...");
+  
+  const { data, error } = await supabase.from('settings').select('*');
+  if (error) {
+    console.error("Cloud Fetch Error:", error);
+    return;
+  }
+  
+  if (data) {
+    data.forEach(row => {
+        localStorage.setItem(row.key, JSON.stringify(row.value));
+    });
+  }
+}
+
+// Global Cloud Save (Use this instead of setLS for cloud keys)
+async function saveToCloud(key, val) {
+    localStorage.setItem(key, JSON.stringify(val)); // Local fallback
+    if (CLOUD_ENABLED) {
+        try {
+            await supabase.from('settings').upsert({ 
+                key: key, 
+                value: val, 
+                updated_at: new Date().toISOString() 
+            });
+            console.log(`☁️ Synced ${key} to Supabase`);
+        } catch (e) { console.error("Supabase Save Error:", e); }
+    }
+}
+
+// Initial Migration Tool (One-time push)
+async function migrateToCloud() {
+    if (!CLOUD_ENABLED) return;
+    if (localStorage.getItem('cc_cloud_migrated') === 'yes') return;
+    console.log("🚀 Migrating to Supabase...");
+    const keys = ['cc_bookings', 'cc_gallery', 'cc_booked_dates', 'cc_contact', 'cc_inventory', 'cc_fin_transactions', 'cc_fin_accounts', 'cc_admin_pwd'];
+    for (const k of keys) {
+        const data = localStorage.getItem(k);
+        if (data) {
+            await supabase.from('settings').upsert({ 
+                key: k, 
+                value: JSON.parse(data), 
+                updated_at: new Date().toISOString() 
+            });
+        }
+    }
+    localStorage.setItem('cc_cloud_migrated', 'yes');
+}
+
+
 /* ============================================================
    1. AUTH — Login / Logout
    ============================================================ */
@@ -38,11 +96,47 @@ $('#loginForm').addEventListener('submit', (e) => {
   }
 });
 
-function showApp() {
+async function showApp() {
   $('#loginScreen').style.display = 'none';
   $('#adminApp').style.display = 'flex';
+  
+  if (CLOUD_ENABLED) {
+      showToast("☁️ Syncing Cloud...");
+      await migrateToCloud();
+      await syncCloudToLocal();
+      initCloudListeners();
+  }
+  
   loadDashboard();
 }
+
+function initCloudListeners() {
+  if (!CLOUD_ENABLED) return;
+  
+  supabase
+    .channel('public:settings')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, payload => {
+        const row = payload.new;
+        if (!row) return;
+        
+        const key = row.key;
+        const val = row.value;
+        const currentLocal = localStorage.getItem(key);
+        
+        if (JSON.stringify(val) !== currentLocal) {
+            localStorage.setItem(key, JSON.stringify(val));
+            console.log(`🔄 Remote Update: ${key}`);
+            // Re-trigger current panel load to refresh data in UI
+            const activeLink = $('.sb-link.active');
+            if (activeLink && ['inventory','finance','bookings','calendar', 'contact'].includes(activeLink.dataset.panel)) {
+                activeLink.click();
+            }
+        }
+    })
+    .subscribe();
+}
+
+
 
 $('#logoutBtn').addEventListener('click', logout);
 $('#topbarLogout').addEventListener('click', logout);
@@ -197,7 +291,7 @@ function attachBookingActions(container) {
           notifyCustomerStatus(b);
         }
       }
-      setLS('cc_bookings', bookings);
+      saveToCloud('cc_bookings', bookings);
       loadBookings();
       loadDashboard();
     });
@@ -269,7 +363,7 @@ function prePopulateInventory() {
     needsMigration = true;
   }
 
-  if (needsMigration) setLS('cc_inventory', inv);
+  if (needsMigration) saveToCloud('cc_inventory', inv);
   renderInvLog();
 }
 
@@ -290,7 +384,7 @@ ${b.status === 'confirmed' ? 'We will contact you shortly to discuss further det
 
 $('#clearBookingsBtn').addEventListener('click', () => {
   if (!confirm('Clear ALL booking requests? This cannot be undone.')) return;
-  setLS('cc_bookings', []);
+  saveToCloud('cc_bookings', []);
   loadBookings();
   loadDashboard();
 });
@@ -358,7 +452,7 @@ function toggleDateBooked(dateStr) {
     booked.push(dateStr);
     booked.sort();
   }
-  setLS('cc_booked_dates', booked);
+  saveToCloud('cc_booked_dates', booked);
   renderAdminCalendar();
 }
 
@@ -507,7 +601,7 @@ function logInvChange(name, delta, newQty) {
     time: new Date().toISOString()
   });
   
-  setLS('cc_inventory_log', logs.slice(0, 15)); // Keep last 15
+  saveToCloud('cc_inventory_log', logs.slice(0, 15)); // Keep last 15
   renderInvLog();
 }
 
@@ -544,7 +638,7 @@ const clearLogBtn = $('#clearInvLogBtn');
 if (clearLogBtn) {
   clearLogBtn.addEventListener('click', () => {
     if (confirm('Clear the activity log?')) {
-      setLS('cc_inventory_log', []);
+      saveToCloud('cc_inventory_log', []);
       renderInvLog();
     }
   });
@@ -555,7 +649,7 @@ window.updateStockQty = (idx, delta) => {
   const item = items[idx];
   if (!item) return;
   item.qty = Math.max(0, (parseFloat(item.qty) || 0) + delta);
-  setLS('cc_inventory', items);
+  saveToCloud('cc_inventory', items);
   logInvChange(item.name, delta, item.qty);
   renderInventory();
 };
@@ -632,7 +726,7 @@ if (invFm) {
       logInvChange(newItem.name, newItem.qty, newItem.qty);
     }
 
-    setLS('cc_inventory', items);
+    saveToCloud('cc_inventory', items);
     const wrap = $('#addInvFormWrap');
     if (wrap) wrap.style.display = 'none';
     renderInventory();
@@ -667,7 +761,7 @@ window.deleteInvItem = (i) => {
   if (!confirm(`Delete ${item.name} from inventory?`)) return;
   const name = item.name;
   items.splice(i, 1);
-  setLS('cc_inventory', items);
+  saveToCloud('cc_inventory', items);
   showToast(`🗑️ ${name} deleted.`);
   renderInventory();
 };
@@ -732,7 +826,7 @@ function loadGallery() {
       if (!confirm('Remove this item from gallery?')) return;
       const items = getLS('cc_gallery', []);
       items.splice(idx, 1);
-      setLS('cc_gallery', items);
+      saveToCloud('cc_gallery', items);
       loadGallery();
       loadDashboard();
     });
@@ -819,7 +913,7 @@ $('#addToGalleryBtn').addEventListener('click', () => {
   pendingFiles.forEach(f => {
     gallery.push({ src: f.dataUrl, caption: f.caption, type: f.type, addedAt: new Date().toISOString() });
   });
-  setLS('cc_gallery', gallery);
+  saveToCloud('cc_gallery', gallery);
   pendingFiles = [];
   $('#uploadForm').style.display = 'none';
   uploadArea.style.display = 'block';
@@ -865,7 +959,7 @@ $('#contactFormAdmin').addEventListener('submit', (e) => {
     team2: $('#ci-team2').value,
     team3: $('#ci-team3').value
   };
-  setLS('cc_contact', info);
+  saveToCloud('cc_contact', info);
   const note = $('#contactSavedNote');
   note.style.display = 'block';
   setTimeout(() => note.style.display = 'none', 3000);
@@ -914,7 +1008,7 @@ $('#changePasswordForm').addEventListener('submit', (e) => {
     msg.textContent = '❌ Passwords do not match.';
     msg.className = 'pwd-msg error'; return;
   }
-  localStorage.setItem('cc_admin_pwd', next);
+  saveToCloud('cc_admin_pwd', next);
   msg.textContent = '✅ Password changed successfully!';
   msg.className = 'pwd-msg success';
   $('#changePasswordForm').reset();
@@ -924,15 +1018,15 @@ $('#changePasswordForm').addEventListener('submit', (e) => {
 // Settings — data clear
 $('#clearAllBookings').addEventListener('click', () => {
   if (!confirm('Clear ALL booking requests? Cannot be undone.')) return;
-  setLS('cc_bookings', []); loadDashboard(); showToast('Bookings cleared.');
+  saveToCloud('cc_bookings', []); loadDashboard(); showToast('Bookings cleared.');
 });
 $('#clearAllGallery').addEventListener('click', () => {
   if (!confirm('Clear ALL gallery items? Cannot be undone.')) return;
-  setLS('cc_gallery', []); loadDashboard(); showToast('Gallery cleared.');
+  saveToCloud('cc_gallery', []); loadDashboard(); showToast('Gallery cleared.');
 });
 $('#clearCalendar').addEventListener('click', () => {
   if (!confirm('Reset all booked dates?')) return;
-  setLS('cc_booked_dates', []); showToast('Calendar reset.');
+  saveToCloud('cc_booked_dates', []); showToast('Calendar reset.');
 });
 
 /* ============================================================
@@ -1112,8 +1206,8 @@ $('#addTransactionForm').addEventListener('submit', (e) => {
   if (type === 'income' || type === 'investment') acc.balance += amount;
   else acc.balance -= amount;
 
-  setLS('cc_fin_transactions', txs);
-  setLS('cc_fin_accounts', accounts);
+  saveToCloud('cc_fin_transactions', txs);
+  saveToCloud('cc_fin_accounts', accounts);
   
   e.target.reset();
   $('#fin-date').valueAsDate = new Date();
@@ -1139,8 +1233,8 @@ window.deleteTransaction = (id) => {
   }
 
   txs = txs.filter(tx => tx.id !== id);
-  setLS('cc_fin_transactions', txs);
-  setLS('cc_fin_accounts', accounts);
+  saveToCloud('cc_fin_transactions', txs);
+  saveToCloud('cc_fin_accounts', accounts);
   renderFinance();
   showToast('🗑️ Transaction Reverted');
 };
@@ -1167,9 +1261,9 @@ $('#newProgramBtn').addEventListener('click', () => {
   // Reset balances back to opening
   accounts.forEach(a => a.balance = a.opening);
   
-  setLS('cc_fin_history', history);
-  setLS('cc_fin_transactions', []);
-  setLS('cc_fin_accounts', accounts);
+  saveToCloud('cc_fin_history', history);
+  saveToCloud('cc_fin_transactions', []);
+  saveToCloud('cc_fin_accounts', accounts);
 
   renderFinance();
   showToast('🧹 Clean slate started for New Program!');
@@ -1219,7 +1313,7 @@ $('#addFinAccountBtn').addEventListener('click', () => {
     color: '#'+Math.floor(Math.random()*16777215).toString(16) 
   };
   accounts.push(newAcc);
-  setLS('cc_fin_accounts', accounts);
+  saveToCloud('cc_fin_accounts', accounts);
   renderFinance();
   showToast('🏦 Account Added');
 });
