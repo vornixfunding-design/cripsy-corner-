@@ -10,17 +10,22 @@
   <!-- 🐘 Supabase SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <!-- Supabase Configuration Placeholder -->
+  <!-- Supabase Configuration -->
   <script>
     const supabaseUrl = "https://dvybbidcozjrfhrzafxi.supabase.co";
     const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2eWJiaWRjb3pqcmZocnphZnhpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5Nzg2OTgsImV4cCI6MjA5MDU1NDY5OH0.bU1Xp_BWoY4J9niJxYd7vrIIN1hFfEecNoXKjYk9Qm0";
-    
-    let supabase = null;
-    if (supabaseUrl !== "PASTE_YOUR_SUPABASE_URL_HERE") {
-        supabase = supabase.createClient(supabaseUrl, supabaseKey);
+
+    // Use window.sb to avoid colliding with the SDK's own "supabase" global
+    window.sb = null;
+    try {
+      const _sdk = window.supabase || window.supabasejs;
+      if (_sdk && supabaseUrl && supabaseKey) {
+        window.sb = _sdk.createClient(supabaseUrl, supabaseKey);
         console.log("🐘 Supabase Cloud Sync Active");
-    } else {
-        console.warn("⚠️ Supabase keys missing. Running in Local Mode.");
+      }
+    } catch (e) {
+      console.error("Supabase init failed:", e);
+      console.warn("⚠️ Running in Local Mode.");
     }
   </script>
 
