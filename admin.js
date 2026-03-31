@@ -72,10 +72,13 @@ $$('.sb-link').forEach(btn => {
       case 'calendar': renderAdminCalendar(); break;
       case 'inventory': renderInventory(); break;
       case 'gallery': loadGallery(); break;
+      case 'finance': renderFinance(); break;
       case 'contact': loadContactInfo(); break;
+      case 'settings': loadContactInfo(); break;
     }
   });
 });
+
 
 // Mobile sidebar toggle
 $('#topbarMenu').addEventListener('click', () => {
@@ -967,6 +970,262 @@ function escHtml(str) {
 }
 
 /* ============================================================
+   11. PROFESSIONAL FINANCE SUITE
+   ============================================================ */
+
+/**
+ * INIT FINANCE DATA
+ * Accounts: { id, name, type, opening, balance, color }
+ * Transactions: { id, type, date, amount, accountId, desc, member }
+ */
+const DEF_ACCOUNTS = [
+  { id: 'acc_cash', name: '💸 Physical Cash', opening: 0, balance: 0, color: '#22c55e' },
+  { id: 'acc_jatin', name: '🏦 Jatin Bank (SBI)', opening: 0, balance: 0, color: '#fbbf24' },
+  { id: 'acc_aalekh', name: '🏦 Aalekh Bank (HDFC)', opening: 0, balance: 0, color: '#3b82f6' }
+];
+
+function getFinAccounts() { return getLS('cc_fin_accounts', DEF_ACCOUNTS); }
+function getFinTransactions() { return getLS('cc_fin_transactions', []); }
+
+/**
+ * RENDER THE FINANCE PANEL
+ */
+function renderFinance() {
+  const accounts = getFinAccounts();
+  const txs = getFinTransactions();
+  const inventory = getLS('cc_inventory', []);
+
+  // 1. Calculate Totals
+  let totalSales = 0;
+  let totalExpenses = 0;
+  let totalInvestment = 0;
+
+  txs.forEach(t => {
+    if (t.type === 'income') totalSales += t.amount;
+    if (t.type === 'expense') totalExpenses += t.amount;
+    if (t.type === 'investment') totalInvestment += t.amount;
+  });
+
+  // 2. Link Inventory Asset Value
+  let stockValue = inventory.reduce((sum, item) => sum + (item.qty * (item.price || 0)), 0);
+
+  // 3. Update Dashboard Cards
+  $('#finTotalInvestment').textContent = `₹${totalInvestment.toLocaleString()}`;
+  $('#finTotalSales').textContent = `₹${totalSales.toLocaleString()}`;
+  $('#finTotalExpenses').textContent = `₹${totalExpenses.toLocaleString()}`;
+  $('#finStockAsset').textContent = `₹${stockValue.toLocaleString()}`;
+  
+  // Dashboard Home KPI too
+  const dsHealth = $('#dsFinancialHealth');
+  if (dsHealth) dsHealth.textContent = `₹${stockValue.toLocaleString()}`;
+
+  // 4. Render Account Status Grid
+  const accGrid = $('#financeAccountsGrid');
+  // Keep the "Add Account" button but clear everything before it
+  const addBtn = $('#addFinAccountBtn');
+  accGrid.innerHTML = '';
+  
+  accounts.forEach(acc => {
+    const card = document.createElement('div');
+    card.className = 'inv-stat-card';
+    card.style.borderLeft = `4px solid ${acc.color || 'var(--border)'}`;
+    card.innerHTML = `
+      <div class="is-icon" style="background:${acc.color}15; color:${acc.color};">🏦</div>
+      <div class="is-info">
+        <span class="is-label">${escHtml(acc.name)}</span>
+        <div class="is-value">₹${acc.balance.toLocaleString()}</div>
+        <div style="font-size:10px; opacity:0.6; margin-top:4px;">Opening: ₹${acc.opening}</div>
+      </div>
+    `;
+    accGrid.appendChild(card);
+  });
+  accGrid.appendChild(addBtn);
+
+  // 5. Populate Account Select in Form
+  const accSelect = $('#fin-account');
+  accSelect.innerHTML = accounts.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
+
+  // 6. Render Ledger Table
+  renderLedger();
+}
+
+/**
+ * RENDER TRANSACTIONS LEDGER
+ */
+function renderLedger() {
+  const txs = getFinTransactions();
+  const accounts = getFinAccounts();
+  const query = ($('#finSearchLedger') ? $('#finSearchLedger').value.toLowerCase() : '');
+  const list = $('#transactionLedgerBody');
+  list.innerHTML = '';
+
+  const filtered = txs.filter(t => t.desc.toLowerCase().includes(query))
+                     .sort((a,b) => new Date(b.date) - new Date(a.date));
+
+  if (filtered.length === 0) {
+    list.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:40px; opacity:0.5;">No transactions recorded in this session.</td></tr>';
+    return;
+  }
+
+  filtered.forEach(t => {
+    const acc = accounts.find(a => a.id === t.accountId) || { name: 'Unknown' };
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td style="white-space:nowrap;">${t.date}</td>
+      <td><strong>${escHtml(t.desc)}</strong>${t.member ? `<br><small style="color:var(--orange)">Investor: ${t.member}</small>` : ''}</td>
+      <td><small>${escHtml(acc.name)}</small></td>
+      <td><span class="fin-type-badge fin-type-${t.type}">${t.type}</span></td>
+      <td><span class="${t.type === 'income' || t.type === 'investment' ? 'amt-pos' : 'amt-neg'}">
+        ${t.type === 'income' || t.type === 'investment' ? '+' : '-'}₹${t.amount.toLocaleString()}
+      </span></td>
+      <td><button class="btn-adj" onclick="deleteTransaction(${t.id})" title="Delete">✕</button></td>
+    `;
+    list.appendChild(row);
+  });
+}
+
+/**
+ * ADD TRANSACTION
+ */
+$('#addTransactionForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const type = $('#fin-type').value;
+  const amount = parseFloat($('#fin-amount').value);
+  const accountId = $('#fin-account').value;
+  const date = $('#fin-date').value;
+  const desc = $('#fin-desc').value;
+  const member = (type === 'investment' ? $('#fin-member').value : null);
+
+  if (isNaN(amount) || amount <= 0) return;
+
+  const txs = getFinTransactions();
+  const accounts = getFinAccounts();
+  const acc = accounts.find(a => a.id === accountId);
+
+  if (!acc) return;
+
+  // New Transaction
+  const newTx = { id: Date.now(), type, date, amount, accountId, desc, member };
+  txs.unshift(newTx);
+
+  // Update Account Balance
+  if (type === 'income' || type === 'investment') acc.balance += amount;
+  else acc.balance -= amount;
+
+  setLS('cc_fin_transactions', txs);
+  setLS('cc_fin_accounts', accounts);
+  
+  e.target.reset();
+  $('#fin-date').valueAsDate = new Date();
+  renderFinance();
+  showToast('✅ Transaction Recorded');
+});
+
+/**
+ * DELETE TRANSACTION (With Refund)
+ */
+window.deleteTransaction = (id) => {
+  if (!confirm('Revert and delete this transaction?')) return;
+  
+  let txs = getFinTransactions();
+  let accounts = getFinAccounts();
+  const t = txs.find(tx => tx.id === id);
+  if (!t) return;
+
+  const acc = accounts.find(a => a.id === t.accountId);
+  if (acc) {
+    if (t.type === 'income' || t.type === 'investment') acc.balance -= t.amount;
+    else acc.balance += t.amount;
+  }
+
+  txs = txs.filter(tx => tx.id !== id);
+  setLS('cc_fin_transactions', txs);
+  setLS('cc_fin_accounts', accounts);
+  renderFinance();
+  showToast('🗑️ Transaction Reverted');
+};
+
+/**
+ * RESET FOR NEW PROGRAM (ARCHIVE)
+ */
+$('#newProgramBtn').addEventListener('click', () => {
+  const safetyCode = prompt('To START A NEW PROGRAM (Archive current data), type "RESET-FINANCE":');
+  if (safetyCode !== 'RESET-FINANCE') return;
+
+  const accounts = getFinAccounts();
+  const txs = getFinTransactions();
+  const history = getLS('cc_fin_history', []);
+
+  // Save current session to history
+  history.push({
+    sessionId: Date.now(),
+    date: new Date().toLocaleDateString(),
+    totalSales: txs.filter(t => t.type === 'income').reduce((s,t) => s+t.amount, 0),
+    transactions: txs
+  });
+
+  // Reset balances back to opening
+  accounts.forEach(a => a.balance = a.opening);
+  
+  setLS('cc_fin_history', history);
+  setLS('cc_fin_transactions', []);
+  setLS('cc_fin_accounts', accounts);
+
+  renderFinance();
+  showToast('🧹 Clean slate started for New Program!');
+});
+
+// Search filter for ledger
+$('#finSearchLedger').addEventListener('input', renderLedger);
+
+// Helper for type visibility
+$('#fin-type').addEventListener('change', (e) => {
+  $('#fin-member-wrap').style.display = (e.target.value === 'investment' ? 'block' : 'none');
+});
+
+/**
+ * EXPORT FINANCIAL LEDGER (CSV)
+ */
+$('#exportFinLog').addEventListener('click', () => {
+  const txs = getFinTransactions();
+  if (txs.length === 0) return alert('No data to export.');
+
+  let csv = 'Date,Description,Account,Type,Amount,Member\n';
+  txs.forEach(t => {
+    csv += `${t.date},"${t.desc.replace(/"/g,'')}",${t.accountId},${t.type},${t.amount},${t.member || ''}\n`;
+  });
+
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `Cripsy_Corner_Finance_Export_${Date.now()}.csv`;
+  a.click();
+});
+
+/**
+ * ADD NEW ACCOUNT (PROMPT)
+ */
+$('#addFinAccountBtn').addEventListener('click', () => {
+  const name = prompt('Enter Bank/Account Name (e.g. HDFC Ali Account):');
+  if (!name) return;
+  const opening = parseFloat(prompt('Initial/Opening Balance (₹):') || 0);
+  
+  const accounts = getFinAccounts();
+  const newAcc = { 
+    id: 'acc_' + Date.now(), 
+    name, 
+    opening, 
+    balance: opening, 
+    color: '#'+Math.floor(Math.random()*16777215).toString(16) 
+  };
+  accounts.push(newAcc);
+  setLS('cc_fin_accounts', accounts);
+  renderFinance();
+  showToast('🏦 Account Added');
+});
+
+/* ============================================================
    INIT
    ============================================================ */
 checkAuth();
+$('#fin-date').valueAsDate = new Date();
