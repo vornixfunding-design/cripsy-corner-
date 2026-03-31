@@ -349,4 +349,72 @@ if (window.innerWidth > 768) {
   });
 }
 
+/* ============================================================
+   15. AUTOMATED CONTACT INFO
+   ============================================================ */
+function loadContactInfo() {
+  const info = JSON.parse(localStorage.getItem('cc_contact') || '{}');
+  if (Object.keys(info).length === 0) return;
+
+  const fmtPhone = (p) => p.replace(/\s+/g, '');
+  const waPhone = (p) => {
+    let clean = p.replace(/\D/g, '');
+    if (clean.length === 10) clean = '91' + clean;
+    return clean;
+  };
+
+  // Update Call Card
+  const phoneCard = $('#contactPhone');
+  if (phoneCard && info.phone) {
+    phoneCard.href = `tel:${fmtPhone(info.phone)}`;
+    $('p', phoneCard).textContent = info.phone;
+  }
+
+  // Update WhatsApp Card
+  const waCard = $('#contactWhatsapp');
+  if (waCard && info.whatsapp) {
+    const cleanWA = waPhone(info.whatsapp);
+    waCard.href = `https://wa.me/${cleanWA}?text=Hi! I am interested in booking Cripsy Corner for my event.`;
+    $('p', waCard).textContent = info.whatsapp;
+  }
+
+  // Update Instagram Card
+  const igCard = $('#contactInstagram');
+  if (igCard && info.instagram) {
+    const handle = info.instagram.startsWith('@') ? info.instagram : '@' + info.instagram;
+    const cleanHandle = info.instagram.replace('@', '');
+    igCard.href = `https://instagram.com/${cleanHandle}`;
+    $('p', igCard).textContent = handle;
+  }
+
+  // Update Email Card
+  const emailCard = $('#contactEmail');
+  if (emailCard && info.email) {
+    emailCard.href = `mailto:${info.email}`;
+    $('p', emailCard).textContent = info.email;
+  }
+
+  // Update Floating WhatsApp Button
+  const waFab = $('#whatsappFab');
+  if (waFab && info.whatsapp) {
+    const cleanWA = waPhone(info.whatsapp);
+    waFab.href = `https://wa.me/${cleanWA}?text=Hi! I am interested in booking Cripsy Corner for my event.`;
+  }
+
+  // Update Team Members in About Section
+  const teamText = $('#aboutTeamText');
+  if (teamText && (info.team1 || info.team2 || info.team3)) {
+    const members = [info.team1, info.team2, info.team3].filter(m => !!m);
+    let memberStr = '';
+    if (members.length === 1) memberStr = members[0];
+    else if (members.length === 2) memberStr = `${members[0]} and ${members[1]}`;
+    else if (members.length === 3) memberStr = `${members[0]}, ${members[1]}, and ${members[2]}`;
+    
+    if (memberStr) {
+      teamText.innerHTML = `Cripsy Corner is perfect for college fests, school events, birthday parties, exhibitions, and corporate events. Started by <strong>${memberStr}</strong>, Cripsy Corner is not just food — it's an experience.`;
+    }
+  }
+}
+loadContactInfo();
+
 console.log('%c🌶️ Cripsy Corner — From Packet to Perfect Snack!', 'color:#FF7A00;font-weight:bold;font-size:16px;');
