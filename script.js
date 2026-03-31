@@ -4,6 +4,44 @@
 const $ = (sel, ctx = document) => ctx.querySelector(sel);
 const $$ = (sel, ctx = document) => [...ctx.querySelectorAll(sel)];
 
+/* 🐘 SUPABASE LIVE SYNC ENGINE */
+const CLOUD_ENABLED = (typeof supabase !== 'undefined' && supabase !== null);
+
+if (CLOUD_ENABLED) {
+    console.log("🐘 Live Home Sync Active");
+    
+    // 1. Initial Fetch (Catch up on any missed data)
+    supabase.from('settings').select('*').then(({ data }) => {
+        if (data) {
+            data.forEach(row => {
+                localStorage.setItem(row.key, JSON.stringify(row.value));
+            });
+            // Initial UI update
+            if (typeof loadContactInfo === 'function') loadContactInfo();
+            if (typeof renderCalendar === 'function') renderCalendar();
+            if (typeof loadAdminGallery === 'function') loadAdminGallery();
+        }
+    });
+
+    // 2. Real-time Subscription (Instant updates)
+    supabase
+        .channel('public:settings')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, payload => {
+            const row = payload.new;
+            if (!row) return;
+            
+            localStorage.setItem(row.key, JSON.stringify(row.value));
+            console.log(`🔄 Remote Update: ${row.key}`);
+            
+            // Trigger UI refreshes
+            if (row.key === 'cc_contact' && typeof loadContactInfo === 'function') loadContactInfo();
+            if (row.key === 'cc_booked_dates' && typeof renderCalendar === 'function') renderCalendar();
+            if (row.key === 'cc_gallery' && typeof loadAdminGallery === 'function') loadAdminGallery();
+        })
+        .subscribe();
+}
+
+
 /* ============================================================
    1. LOADER
    ============================================================ */
