@@ -427,6 +427,13 @@ input, select, textarea { font-family: inherit; }
 /* ============================================================
    RESPONSIVE
    ============================================================ */
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width: 1024px) {
+  .inv-stats-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
 @media (max-width: 900px) {
   :root { --sidebar-w: 0px; }
   .sidebar { transform: translateX(-240px); width: 240px; }
@@ -436,9 +443,28 @@ input, select, textarea { font-family: inherit; }
   .dash-stats { grid-template-columns: repeat(2,1fr); }
   .bc-details { grid-template-columns: repeat(2,1fr); }
 }
+
+@media (max-width: 768px) {
+  .inv-toolbar { flex-direction: column; align-items: stretch; }
+  .inv-search-wrap { max-width: none; }
+  .inv-actions { justify-content: flex-start; flex-wrap: wrap; }
+  .inventory-table-wrap { overflow-x: auto; margin: 0 -18px; padding: 0 18px; -webkit-overflow-scrolling: touch; }
+  .luxury-table { min-width: 700px; }
+  .inv-stats-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
+  .inv-stat-card { padding: 16px; gap: 12px; }
+  .is-value { font-size: 26px; }
+  .is-icon { width: 40px; height: 40px; font-size: 20px; }
+  
+  .form-row { grid-template-columns: 1fr !important; gap: 4px !important; }
+}
+
 @media (max-width: 540px) {
   .dash-stats { grid-template-columns: 1fr 1fr; }
   .bc-details { grid-template-columns: 1fr; }
   .login-card { padding: 32px 22px; }
   .gallery-admin-grid { grid-template-columns: repeat(2,1fr); }
+  
+  .inv-stats-grid { grid-template-columns: 1fr; }
+  .inv-actions { flex-direction: column; align-items: stretch; }
+  .btn-admin { width: 100%; text-align: center; justify-content: center; }
 }
