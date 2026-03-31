@@ -51,7 +51,7 @@ window.addEventListener('load', () => {
     loader.classList.add('hidden');
     document.body.style.overflow = '';
     triggerHeroTextReveal();
-  }, 2400);
+  }, 800); // Snappy 0.8s loader
 });
 document.body.style.overflow = 'hidden';
 
