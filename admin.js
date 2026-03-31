@@ -380,17 +380,20 @@ $('#adminCalPrev').addEventListener('click', () => { adminCalDate.setMonth(admin
 $('#adminCalNext').addEventListener('click', () => { adminCalDate.setMonth(adminCalDate.getMonth()+1); renderAdminCalendar(); });
 
 /* ============================================================
-   6. PROFESSIONAL INVENTORY MANAGEMENT — PHASE 2
+   6. PROFESSIONAL INVENTORY MANAGEMENT — PHASE 2 (DR)
    ============================================================ */
 function renderInventory() {
   const inv = getLS('cc_inventory', []);
   const list = $('#inventoryList');
-  const query = ($('#invSearchInput').value || '').toLowerCase();
-  const catFilter = $('#invCategoryFilter').value || 'all';
-  
-  if (!list) return;
+  if (!list) return; // Silent return if not on inventory panel
 
-  // 1. Calculate Dash Stats
+  // Safe lookup for query and filters
+  const searchEl = $('#invSearchInput');
+  const catEl = $('#invCategoryFilter');
+  const query = (searchEl ? searchEl.value : '').toLowerCase();
+  const catFilter = (catEl ? catEl.value : 'all');
+
+  // 1. Calculate Dash Stats (Safe check for elements)
   let totalItems = inv.length;
   let lowCount = 0;
   let outCount = 0;
@@ -403,20 +406,23 @@ function renderInventory() {
     totalUnits += qty;
     totalValue += (qty * price);
     if (qty <= 0) outCount++;
-    else if (qty <= (item.min || 0)) lowCount++;
+    else if (qty <= (parseFloat(item.min) || 0)) lowCount++;
   });
 
-  $('#invStatTotal').textContent = totalItems;
-  $('#invStatLow').textContent = lowCount;
-  $('#invStatOut').textContent = outCount;
-  $('#invStatValue').textContent = totalUnits;
-  $('#invStatValTotal').textContent = `₹${totalValue.toLocaleString('en-IN')}`;
+  const setSafeText = (id, val) => { const el = $(id); if (el) el.textContent = val; };
+  setSafeText('#invStatTotal', totalItems);
+  setSafeText('#invStatLow', lowCount);
+  setSafeText('#invStatOut', outCount);
+  setSafeText('#invStatValue', totalUnits);
+  setSafeText('#invStatValTotal', `₹${totalValue.toLocaleString('en-IN')}`);
 
   // 2. Filter logic
   const filtered = inv.map((item, originalIndex) => ({ ...item, originalIndex }))
     .filter(item => {
-      const matchesSearch = item.name.toLowerCase().includes(query);
-      const matchesCat = catFilter === 'all' || item.category === catFilter;
+      const name = item.name || '';
+      const cat = item.category || 'all';
+      const matchesSearch = name.toLowerCase().includes(query);
+      const matchesCat = catFilter === 'all' || cat === catFilter;
       return matchesSearch && matchesCat;
     });
   
@@ -430,31 +436,35 @@ function renderInventory() {
 
   // 3. Render Table
   list.innerHTML = filtered.map((item) => {
-    const qty = item.qty || 0;
-    const min = item.min || 0;
-    const healthPercent = Math.min(100, (qty / (min * 3)) * 100); 
+    const qty = parseFloat(item.qty) || 0;
+    const min = parseFloat(item.min) || 0;
+    const price = item.price || 0;
+    const unit = item.unit || 'units';
+    const cat = item.category || 'packets';
+    
+    const healthPercent = min > 0 ? Math.min(100, (qty / (min * 3)) * 100) : (qty > 0 ? 100 : 0);
     let healthColor = 'var(--green)';
     if (qty <= 0) healthColor = '#ff4444';
     else if (qty <= min) healthColor = 'var(--orange)';
 
-    const catIconClass = `cat-icon-${item.category}`;
+    const catIconClass = `cat-icon-${cat}`;
 
     return `
       <tr>
         <td style="padding:16px 12px; text-align:center;">
           <div class="is-icon" style="width:36px; height:36px; font-size:18px; ${catIconClass}">
-            ${item.category === 'packets' ? '🍿' : item.category === 'sauces' ? '🧴' : '🥬'}
+            ${cat === 'packets' ? '🍿' : cat === 'sauces' ? '🧴' : '🥬'}
           </div>
         </td>
         <td style="padding:16px 12px;">
           <div style="font-weight:800; color:#fff;">${escHtml(item.name)}</div>
-          <div style="font-size:10px; opacity:0.5; text-transform:uppercase;">₹${item.price || 0}/unit</div>
+          <div style="font-size:10px; opacity:0.5; text-transform:uppercase;">₹${price}/unit</div>
         </td>
-        <td style="padding:16px 12px;"><span class="badge" style="background:rgba(255,255,255,0.05);">${item.category.toUpperCase()}</span></td>
+        <td style="padding:16px 12px;"><span class="badge" style="background:rgba(255,255,255,0.05);">${cat.toUpperCase()}</span></td>
         <td style="padding:16px 12px;">
           <div class="stock-health-container">
             <div class="sh-text">
-              <span style="color:${healthColor}">${qty} ${item.unit}</span>
+              <span style="color:${healthColor}">${qty} ${unit}</span>
               <span style="opacity:0.4;">min: ${min}</span>
             </div>
             <div class="stock-health-bar">
@@ -499,10 +509,10 @@ function logInvChange(name, delta, newQty) {
 }
 
 function renderInvLog() {
-  const logs = getLS('cc_inventory_log', []);
   const container = $('#invActivityLog');
-  if (!container) return;
+  if (!container) return; // Safe safeguard
 
+  const logs = getLS('cc_inventory_log', []);
   if (logs.length === 0) {
     container.innerHTML = `<p style="color:var(--text-muted); font-size:13px;">No recent changes recorded.</p>`;
     return;
@@ -527,8 +537,9 @@ function renderInvLog() {
   }).join('');
 }
 
-if ($('#clearInvLogBtn')) {
-  $('#clearInvLogBtn').addEventListener('click', () => {
+const clearLogBtn = $('#clearInvLogBtn');
+if (clearLogBtn) {
+  clearLogBtn.addEventListener('click', () => {
     if (confirm('Clear the activity log?')) {
       setLS('cc_inventory_log', []);
       renderInvLog();
@@ -539,15 +550,16 @@ if ($('#clearInvLogBtn')) {
 window.updateStockQty = (idx, delta) => {
   const items = getLS('cc_inventory', []);
   const item = items[idx];
+  if (!item) return;
   item.qty = Math.max(0, (parseFloat(item.qty) || 0) + delta);
   setLS('cc_inventory', items);
   logInvChange(item.name, delta, item.qty);
   renderInventory();
 };
 
-if ($('#invSearchInput')) $('#invSearchInput').addEventListener('input', renderInventory);
-if ($('#invCategoryFilter')) $('#invCategoryFilter').addEventListener('change', renderInventory);
-if ($('#reorderInvBtn')) $('#reorderInvBtn').addEventListener('click', generateReorderWhatsAppList);
+const sInput = $('#invSearchInput'); if (sInput) sInput.addEventListener('input', renderInventory);
+const cFilter = $('#invCategoryFilter'); if (cFilter) cFilter.addEventListener('change', renderInventory);
+const rOBtn = $('#reorderInvBtn'); if (rOBtn) rOBtn.addEventListener('click', generateReorderWhatsAppList);
 
 function generateReorderWhatsAppList() {
   const inv = getLS('cc_inventory', []);
@@ -561,7 +573,7 @@ function generateReorderWhatsAppList() {
   let msg = `🛒 *CRIPSY CORNER: URGENT SHOPPING LIST*\n`;
   msg += `━━━━━━━━━━━━━━━━━━━━\n`;
   low.forEach(item => {
-    msg += `• *${item.name}*: ${item.qty} ${item.unit} left (Min: ${item.min})\n`;
+    msg += `• *${item.name}*: ${item.qty} ${item.unit || 'units'} left (Min: ${item.min})\n`;
   });
   msg += `━━━━━━━━━━━━━━━━━━━━\n`;
   msg += `📅 _Generated: ${new Date().toLocaleDateString('en-IN')}_\n`;
@@ -569,40 +581,48 @@ function generateReorderWhatsAppList() {
   window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
 }
 
-if ($('#addInvBtn')) {
-  $('#addInvBtn').addEventListener('click', () => {
-    $('#addInvForm').reset();
-    $('#inv-id').value = '';
-    $('#invFormTitle').textContent = '➕ Add New Inventory Item';
-    $('#addInvFormWrap').style.display = 'block';
+const addIBtn = $('#addInvBtn');
+if (addIBtn) {
+  addIBtn.addEventListener('click', () => {
+    const form = $('#addInvForm');
+    const wrap = $('#addInvFormWrap');
+    if (form) form.reset();
+    const idEl = $('#inv-id'); if (idEl) idEl.value = '';
+    const titleEl = $('#invFormTitle'); if (titleEl) titleEl.textContent = '➕ Add New Inventory Item';
+    if (wrap) wrap.style.display = 'block';
   });
 }
 
-if ($('#cancelInvBtn')) {
-  $('#cancelInvBtn').addEventListener('click', () => {
-    $('#addInvFormWrap').style.display = 'none';
+const cancelIBtn = $('#cancelInvBtn');
+if (cancelIBtn) {
+  cancelIBtn.addEventListener('click', () => {
+    const wrap = $('#addInvFormWrap');
+    if (wrap) wrap.style.display = 'none';
   });
 }
 
-if ($('#addInvForm')) {
-  $('#addInvForm').addEventListener('submit', (e) => {
+const invFm = $('#addInvForm');
+if (invFm) {
+  invFm.addEventListener('submit', (e) => {
     e.preventDefault();
-    const idStr = $('#inv-id').value;
+    const idEl = $('#inv-id');
+    const idStr = idEl ? idEl.value : '';
     const items = getLS('cc_inventory', []);
     
     const newItem = {
-      name: $('#inv-name').value,
-      category: $('#inv-category').value,
-      qty: parseFloat($('#inv-qty').value) || 0,
-      unit: $('#inv-unit').value,
-      min: parseFloat($('#inv-min').value) || 0,
-      price: parseFloat($('#inv-price').value) || 0
+      name: $('#inv-name')?.value || '',
+      category: $('#inv-category')?.value || 'packets',
+      qty: parseFloat($('#inv-qty')?.value) || 0,
+      unit: $('#inv-unit')?.value || 'units',
+      min: parseFloat($('#inv-min')?.value) || 0,
+      price: parseFloat($('#inv-price')?.value) || 0
     };
 
     if (idStr !== '') {
-      const oldQty = items[parseInt(idStr)].qty;
+      const idx = parseInt(idStr);
+      const oldQty = items[idx]?.qty || 0;
       const diff = newItem.qty - oldQty;
-      items[parseInt(idStr)] = newItem;
+      items[idx] = newItem;
       if (diff !== 0) logInvChange(newItem.name, diff, newItem.qty);
     } else {
       items.push(newItem);
@@ -610,7 +630,8 @@ if ($('#addInvForm')) {
     }
 
     setLS('cc_inventory', items);
-    $('#addInvFormWrap').style.display = 'none';
+    const wrap = $('#addInvFormWrap');
+    if (wrap) wrap.style.display = 'none';
     renderInventory();
     showToast('📦 Inventory professional suite updated!');
   });
@@ -619,37 +640,46 @@ if ($('#addInvForm')) {
 window.editInvItem = (i) => {
   const items = getLS('cc_inventory', []);
   const item = items[i];
-  $('#inv-id').value = i;
-  $('#invFormTitle').textContent = '✏️ Edit Inventory Item';
-  $('#inv-name').value = item.name;
-  $('#inv-category').value = item.category;
-  $('#inv-qty').value = item.qty;
-  $('#inv-unit').value = item.unit;
-  $('#inv-min').value = item.min;
-  $('#inv-price').value = item.price || 0;
-  $('#addInvFormWrap').style.display = 'block';
-  $('#addInvFormWrap').scrollIntoView({ behavior: 'smooth' });
+  if (!item) return;
+  const idEl = $('#inv-id'); if (idEl) idEl.value = i;
+  const titleEl = $('#invFormTitle'); if (titleEl) titleEl.textContent = '✏️ Edit Inventory Item';
+  const nameEl = $('#inv-name'); if (nameEl) nameEl.value = item.name || '';
+  const catEl = $('#inv-category'); if (catEl) catEl.value = item.category || 'packets';
+  const qtyEl = $('#inv-qty'); if (qtyEl) qtyEl.value = item.qty || 0;
+  const unitEl = $('#inv-unit'); if (unitEl) unitEl.value = item.unit || 'units';
+  const minEl = $('#inv-min'); if (minEl) minEl.value = item.min || 0;
+  const priceEl = $('#inv-price'); if (priceEl) priceEl.value = item.price || 0;
+  
+  const wrap = $('#addInvFormWrap');
+  if (wrap) {
+    wrap.style.display = 'block';
+    wrap.scrollIntoView({ behavior: 'smooth' });
+  }
 };
 
 window.deleteInvItem = (i) => {
-  if (!confirm('Delete this item from inventory?')) return;
   const items = getLS('cc_inventory', []);
-  const name = items[i].name;
+  const item = items[i];
+  if (!item) return;
+  if (!confirm(`Delete ${item.name} from inventory?`)) return;
+  const name = item.name;
   items.splice(i, 1);
   setLS('cc_inventory', items);
   showToast(`🗑️ ${name} deleted.`);
   renderInventory();
 };
 
-if ($('#exportInvBtn')) {
-  $('#exportInvBtn').addEventListener('click', () => {
+const expBtn = $('#exportInvBtn');
+if (expBtn) {
+  expBtn.addEventListener('click', () => {
     const inv = getLS('cc_inventory', []);
     if (inv.length === 0) { alert('No inventory to export!'); return; }
 
     let csv = 'Item Name,Category,Quantity,Unit,Min Level,Price,Total Value\n';
     inv.forEach(item => {
-      const total = (item.qty || 0) * (item.price || 0);
-      csv += `"${item.name}","${item.category}",${item.qty},"${item.unit}",${item.min},${item.price},${total}\n`;
+      const q = parseFloat(item.qty) || 0;
+      const p = parseFloat(item.price) || 0;
+      csv += `"${item.name || ''}","${item.category || ''}",${q},"${item.unit || ''}",${item.min || 0},${p},${q * p}\n`;
     });
 
     const blob = new Blob([csv], { type: 'text/csv' });
