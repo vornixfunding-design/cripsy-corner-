@@ -12,6 +12,20 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Nunito:wght@400;600;700;800;900&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
+
+  <!-- 🐘 Supabase SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- Supabase Configuration Placeholder -->
+  <script>
+    const supabaseUrl = "https://dvybbidcozjrfhrzafxi.supabase.co";
+    const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2eWJiaWRjb3pqcmZocnphZnhpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5Nzg2OTgsImV4cCI6MjA5MDU1NDY5OH0.bU1Xp_BWoY4J9niJxYd7vrIIN1hFfEecNoXKjYk9Qm0";
+    
+    let supabase = null;
+    if (supabaseUrl !== "PASTE_YOUR_SUPABASE_URL_HERE") {
+        supabase = supabasejs.createClient(supabaseUrl, supabaseKey);
+    }
+  </script>
 </head>
 <body>
 
