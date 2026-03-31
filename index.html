@@ -23,7 +23,7 @@
     
     let supabase = null;
     if (supabaseUrl !== "PASTE_YOUR_SUPABASE_URL_HERE") {
-        supabase = supabasejs.createClient(supabaseUrl, supabaseKey);
+        supabase = supabase.createClient(supabaseUrl, supabaseKey);
     }
   </script>
 </head>
