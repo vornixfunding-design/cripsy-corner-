@@ -46,6 +46,7 @@
         <button class="sb-link active" data-panel="dashboard">📊 Dashboard</button>
         <button class="sb-link" data-panel="bookings">📋 Bookings</button>
         <button class="sb-link" data-panel="calendar">📅 Availability</button>
+        <button class="sb-link" data-panel="inventory">📦 Inventory</button>
         <button class="sb-link" data-panel="gallery">🖼️ Gallery</button>
         <button class="sb-link" data-panel="contact">📞 Contact Info</button>
         <button class="sb-link" data-panel="settings">⚙️ Settings</button>
@@ -152,6 +153,76 @@
         </div>
       </div>
 
+      <!-- ===== INVENTORY ===== -->
+      <div class="panel" id="panel-inventory">
+        <div class="panel-header">
+          <h1>📦 Inventory Management</h1>
+          <p>Track your stock levels for packets, sauces, and raw materials.</p>
+        </div>
+        
+        <div class="inventory-grid">
+          <div class="inv-controls">
+            <button class="btn-admin btn-primary" id="addInvBtn">➕ Add New Item</button>
+            <div class="inv-stats-summary" id="invStatsSummary">
+              <span class="inv-stat-item">🔴 Low Stock: <strong id="lowStockCount">0</strong></span>
+            </div>
+          </div>
+
+          <div id="addInvFormWrap" class="upload-form" style="display:none; margin-top: 16px;">
+            <h3>Add/Edit Inventory Item</h3>
+            <form id="addInvForm" class="contact-form-admin">
+              <input type="hidden" id="inv-id" />
+              <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+                <div class="form-group-admin">
+                  <label>Item Name</label>
+                  <input type="text" id="inv-name" placeholder="e.g. Blue Lays" required />
+                </div>
+                <div class="form-group-admin">
+                  <label>Category</label>
+                  <select id="inv-category" class="admin-select" style="width:100%;" required>
+                    <option value="packets">Packets (Chips/Namkeen)</option>
+                    <option value="sauces">Sauces & Masalas</option>
+                    <option value="raw">Raw Materials (Veggies/Corn)</option>
+                    <option value="other">Other Supplies</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:10px;">
+                <div class="form-group-admin">
+                  <label>Stock Quantity / Unit</label>
+                  <input type="text" id="inv-stock" placeholder="e.g. 50 packs / 5 kg" required />
+                </div>
+                <div class="form-group-admin">
+                  <label>Min. Level (for warning)</label>
+                  <input type="number" id="inv-min" placeholder="e.g. 10" required />
+                </div>
+              </div>
+              <div style="margin-top:16px; display:flex; gap:10px;">
+                <button type="submit" class="btn-admin btn-primary">💾 Save Item</button>
+                <button type="button" class="btn-admin btn-ghost" id="cancelInvBtn">Cancel</button>
+              </div>
+            </form>
+          </div>
+
+          <div class="inv-table-wrap" style="margin-top:24px;">
+            <table class="admin-table" style="width:100%; border-collapse: collapse;">
+              <thead>
+                <tr style="text-align:left; border-bottom: 1px solid var(--border);">
+                  <th style="padding:12px;">Item</th>
+                  <th style="padding:12px;">Category</th>
+                  <th style="padding:12px;">Current Stock</th>
+                  <th style="padding:12px;">Status</th>
+                  <th style="padding:12px;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="inventoryList">
+                <!-- Items populated by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       <!-- ===== GALLERY ===== -->
       <div class="panel" id="panel-gallery">
         <div class="panel-header">
@@ -215,7 +286,23 @@
             <label>City / Location</label>
             <input type="text" id="ci-city" placeholder="Your city" />
           </div>
-          <button type="submit" class="btn-admin btn-primary">💾 Save Contact Info</button>
+          <div style="border-top: 1px solid var(--border); margin: 24px 0; padding-top: 20px;">
+            <h3 style="font-size:16px; margin-bottom:16px; color:var(--orange);">👥 Team Notification Settings</h3>
+            <p style="font-size:12px; color:var(--text-muted); margin-bottom:12px;">Enter phone numbers for your 3 team members to receive booking alerts.</p>
+            <div class="form-group-admin">
+              <label>Team Member 1 (WhatsApp)</label>
+              <input type="tel" id="ci-team1" placeholder="+91 99999 99999" />
+            </div>
+            <div class="form-group-admin">
+              <label>Team Member 2 (WhatsApp)</label>
+              <input type="tel" id="ci-team2" placeholder="+91 88888 88888" />
+            </div>
+            <div class="form-group-admin">
+              <label>Team Member 3 (WhatsApp)</label>
+              <input type="tel" id="ci-team3" placeholder="+91 77777 77777" />
+            </div>
+          </div>
+          <button type="submit" class="btn-admin btn-primary">💾 Save All Settings</button>
         </form>
         <div class="contact-saved-note" id="contactSavedNote" style="display:none">✅ Saved successfully!</div>
 
