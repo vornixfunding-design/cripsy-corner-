@@ -15,14 +15,14 @@ const setLS = (key, val) => localStorage.setItem(key, JSON.stringify(val));
 /**
  * 🌶️ CLOUD SYNC ENGINE (Supabase)
  */
-const CLOUD_ENABLED = (typeof supabase !== 'undefined' && supabase !== null);
+const CLOUD_ENABLED = !!window.sb;
 
 // Helper to get all data from a cloud collection
 async function syncCloudToLocal() {
   if (!CLOUD_ENABLED) return;
   console.log("🌦️ Syncing Cloud to Local...");
   
-  const { data, error } = await supabase.from('settings').select('*');
+  const { data, error } = await window.sb.from('settings').select('*');
   if (error) {
     console.error("Cloud Fetch Error:", error);
     return;
@@ -40,7 +40,7 @@ async function saveToCloud(key, val) {
     localStorage.setItem(key, JSON.stringify(val)); // Local fallback
     if (CLOUD_ENABLED) {
         try {
-            await supabase.from('settings').upsert({ 
+            await window.sb.from('settings').upsert({ 
                 key: key, 
                 value: val, 
                 updated_at: new Date().toISOString() 
@@ -59,7 +59,7 @@ async function migrateToCloud() {
     for (const k of keys) {
         const data = localStorage.getItem(k);
         if (data) {
-            await supabase.from('settings').upsert({ 
+            await window.sb.from('settings').upsert({ 
                 key: k, 
                 value: JSON.parse(data), 
                 updated_at: new Date().toISOString() 
@@ -75,7 +75,31 @@ async function migrateToCloud() {
    ============================================================ */
 const DEFAULT_PWD = 'admin123';
 
-function getPassword() { return localStorage.getItem('cc_admin_pwd') || DEFAULT_PWD; }
+function getPassword() {
+  const raw = localStorage.getItem('cc_admin_pwd');
+  if (!raw) return DEFAULT_PWD;
+  // raw may be a plain string or a JSON-encoded string ("\"password\"")
+  try { return JSON.parse(raw); } catch { return raw; }
+}
+
+// Fetch the latest admin password from Supabase BEFORE login is attempted
+async function preLoginSync() {
+  if (!CLOUD_ENABLED) return;
+  try {
+    const { data, error } = await window.sb
+      .from('settings')
+      .select('key,value')
+      .eq('key', 'cc_admin_pwd');
+    if (error) { console.warn("Pre-login sync failed:", error); return; }
+    if (data && data.length > 0) {
+      data.forEach(row => {
+        localStorage.setItem(row.key, JSON.stringify(row.value));
+      });
+    }
+  } catch (e) {
+    console.warn("Pre-login sync error:", e);
+  }
+}
 
 function checkAuth() {
   const authed = sessionStorage.getItem('cc_admin_authed');
@@ -113,7 +137,7 @@ async function showApp() {
 function initCloudListeners() {
   if (!CLOUD_ENABLED) return;
   
-  supabase
+  window.sb
     .channel('public:settings')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, payload => {
         const row = payload.new;
@@ -1321,5 +1345,9 @@ $('#addFinAccountBtn').addEventListener('click', () => {
 /* ============================================================
    INIT
    ============================================================ */
-checkAuth();
-$('#fin-date').valueAsDate = new Date();
+document.addEventListener('DOMContentLoaded', async () => {
+  const finDate = $('#fin-date');
+  if (finDate) finDate.valueAsDate = new Date();
+  await preLoginSync();
+  checkAuth();
+});
