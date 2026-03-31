@@ -153,23 +153,75 @@
         </div>
       </div>
 
-      <!-- ===== INVENTORY ===== -->
+      <!-- ===== INVENTORY DASHBOARD ===== -->
       <div class="panel" id="panel-inventory">
         <div class="panel-header">
           <h1>📦 Inventory Management</h1>
-          <p>Track your stock levels for packets, sauces, and raw materials.</p>
+          <p>Professional stock tracking for Cripsy Corner's snacks and materials.</p>
         </div>
         
+        <!-- Stats Cards Area -->
+        <div class="inv-stats-grid">
+          <div class="inv-stat-card card-total">
+            <div class="is-icon">📦</div>
+            <div class="is-info">
+              <span class="is-label">Total SKUs</span>
+              <div class="is-value" id="invStatTotal">0</div>
+            </div>
+          </div>
+          <div class="inv-stat-card card-low">
+            <div class="is-icon">⚠️</div>
+            <div class="is-info">
+              <span class="is-label">Low Stock</span>
+              <div class="is-value" id="invStatLow">0</div>
+            </div>
+          </div>
+          <div class="inv-stat-card card-out">
+            <div class="is-icon">🚫</div>
+            <div class="is-info">
+              <span class="is-label">Out of Stock</span>
+              <div class="is-value" id="invStatOut">0</div>
+            </div>
+          </div>
+          <div class="inv-stat-card card-value">
+            <div class="is-icon">📦</div>
+            <div class="is-info">
+              <span class="is-label">Total Units</span>
+              <div class="is-value" id="invStatValue">0</div>
+            </div>
+          </div>
+          <div class="inv-stat-card card-total-value">
+            <div class="is-icon">💰</div>
+            <div class="is-info">
+              <span class="is-label">Asset Value</span>
+              <div class="is-value" id="invStatValTotal">₹0</div>
+            </div>
+          </div>
+        </div>
+
         <div class="inventory-grid">
-          <div class="inv-controls">
-            <button class="btn-admin btn-primary" id="addInvBtn">➕ Add New Item</button>
-            <div class="inv-stats-summary" id="invStatsSummary">
-              <span class="inv-stat-item">🔴 Low Stock: <strong id="lowStockCount">0</strong></span>
+          <!-- Control Bar -->
+          <div class="inv-toolbar">
+            <div class="inv-search-wrap">
+              <span class="search-icon">🔍</span>
+              <input type="text" id="invSearchInput" placeholder="Search snacks or materials..." />
+            </div>
+            <div class="inv-actions">
+              <select id="invCategoryFilter" class="admin-select">
+                <option value="all">All Categories</option>
+                <option value="packets">Packets (Chips/Namkeen)</option>
+                <option value="sauces">Sauces & Masalas</option>
+                <option value="raw">Raw Materials</option>
+              </select>
+              <button class="btn-admin btn-ghost" id="exportInvBtn">📥 CSV Report</button>
+              <button class="btn-admin btn-primary" id="reorderInvBtn" title="Generate WhatsApp Reorder List">📢 Reorder List</button>
+              <button class="btn-admin btn-primary" id="addInvBtn">➕ Add Item</button>
             </div>
           </div>
 
-          <div id="addInvFormWrap" class="upload-form" style="display:none; margin-top: 16px;">
-            <h3>Add/Edit Inventory Item</h3>
+          <!-- Add Form (Modal-style overlay) -->
+          <div id="addInvFormWrap" class="upload-form" style="display:none; margin-top: 16px; border: 1px solid var(--orange);">
+            <h3 id="invFormTitle">📦 Add/Edit Inventory Item</h3>
             <form id="addInvForm" class="contact-form-admin">
               <input type="hidden" id="inv-id" />
               <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
@@ -182,43 +234,70 @@
                   <select id="inv-category" class="admin-select" style="width:100%;" required>
                     <option value="packets">Packets (Chips/Namkeen)</option>
                     <option value="sauces">Sauces & Masalas</option>
-                    <option value="raw">Raw Materials (Veggies/Corn)</option>
-                    <option value="other">Other Supplies</option>
+                    <option value="raw">Raw Materials</option>
                   </select>
                 </div>
               </div>
-              <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:10px;">
+              <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:16px; margin-top:10px;">
                 <div class="form-group-admin">
-                  <label>Stock Quantity / Unit</label>
-                  <input type="text" id="inv-stock" placeholder="e.g. 50 packs / 5 kg" required />
+                  <label>Quantity</label>
+                  <input type="number" id="inv-qty" placeholder="50" required />
                 </div>
                 <div class="form-group-admin">
-                  <label>Min. Level (for warning)</label>
-                  <input type="number" id="inv-min" placeholder="e.g. 10" required />
+                  <label>Unit</label>
+                  <select id="inv-unit" class="admin-select" style="width:100%;">
+                    <option value="packs">Packs</option>
+                    <option value="kg">kg</option>
+                    <option value="g">g</option>
+                    <option value="units">units</option>
+                    <option value="bottles">bottles</option>
+                  </select>
+                </div>
+                <div class="form-group-admin">
+                  <label>Min. Level</label>
+                  <input type="number" id="inv-min" placeholder="10" required />
+                </div>
+                <div class="form-group-admin">
+                  <label>Price (₹)</label>
+                  <input type="number" id="inv-price" placeholder="0" required />
                 </div>
               </div>
               <div style="margin-top:16px; display:flex; gap:10px;">
-                <button type="submit" class="btn-admin btn-primary">💾 Save Item</button>
+                <button type="submit" class="btn-admin btn-primary">💾 Save Product</button>
                 <button type="button" class="btn-admin btn-ghost" id="cancelInvBtn">Cancel</button>
               </div>
             </form>
           </div>
 
+          <!-- The Professional Table -->
           <div class="inv-table-wrap" style="margin-top:24px;">
-            <table class="admin-table" style="width:100%; border-collapse: collapse;">
+            <table class="admin-table luxury-table" style="width:100%; border-collapse: collapse;">
               <thead>
                 <tr style="text-align:left; border-bottom: 1px solid var(--border);">
-                  <th style="padding:12px;">Item</th>
-                  <th style="padding:12px;">Category</th>
-                  <th style="padding:12px;">Current Stock</th>
-                  <th style="padding:12px;">Status</th>
-                  <th style="padding:12px;">Actions</th>
+                  <th style="padding:16px 12px; width: 40px;"></th>
+                  <th style="padding:16px 12px;">Item Name</th>
+                  <th style="padding:16px 12px;">Category</th>
+                  <th style="padding:16px 12px;">Stock Health</th>
+                  <th style="padding:16px 12px;">Adjustment</th>
+                  <th style="padding:16px 12px;">Actions</th>
                 </tr>
               </thead>
               <tbody id="inventoryList">
                 <!-- Items populated by JS -->
               </tbody>
             </table>
+          </div>
+
+          <!-- Activity Log Selection -->
+          <div class="inv-activity-section" style="margin-top:40px; padding-top:24px; border-top:1px solid var(--border);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+              <h3 style="margin:0; font-size:18px;">📋 Recent Stock Activity</h3>
+              <button class="btn-admin btn-ghost" id="clearInvLogBtn" style="font-size:11px;">Clear Log</button>
+            </div>
+            <div id="invActivityLog" class="inv-activity-log">
+              <!-- Logs populated by JS -->
+              <p style="color:var(--text-muted); font-size:13px;">No recent changes recorded.</p>
+            </div>
           </div>
         </div>
       </div>
