@@ -165,6 +165,7 @@ if (bookingForm) {
       eventDate: $('#eventDate').value,
       location: $('#eventLocation').value,
       people: $('#expectedPeople').value,
+      stallFee: $('#stallFee').value,
       message: $('#message').value,
       status: 'pending',
       submittedAt: new Date().toISOString()
