@@ -225,30 +225,49 @@ Please check the Admin Panel to update inventory and confirm our availability! �
 }
 
 // ------------------------------------------------------------
-// INVENTORY PRE-POPULATION
+// INVENTORY PRE-POPULATION & MIGRATION — Phase 2 Professional
 // ------------------------------------------------------------
 function prePopulateInventory() {
-  const inv = getLS('cc_inventory', []);
-  if (inv.length > 0) return; // Only populate if empty
+  let inv = getLS('cc_inventory', []);
+  let log = getLS('cc_inventory_log', []);
+  let needsMigration = false;
 
-  const defaults = [
-    { name: 'Blue Lays', category: 'packets', stock: '50', min: 10 },
-    { name: 'Yellow Lays', category: 'packets', stock: '50', min: 10 },
-    { name: 'Dark Yellow Lays', category: 'packets', stock: '50', min: 10 },
-    { name: 'Tedhe Medhe', category: 'packets', stock: '50', min: 10 },
-    { name: 'Kurkure Red', category: 'packets', stock: '50', min: 10 },
-    { name: 'Kurkure Green', category: 'packets', stock: '50', min: 10 },
-    { name: 'Mexilla (Yellow/Red)', category: 'packets', stock: '50', min: 10 },
-    { name: 'Tandoori Mayo', category: 'sauces', stock: '5 units', min: 2 },
-    { name: 'White Mayo', category: 'sauces', stock: '5 units', min: 2 },
-    { name: 'Schezwan Sauce', category: 'sauces', stock: '5 units', min: 2 },
-    { name: 'Sweet Corn Packets', category: 'raw', stock: '20', min: 5 },
-    { name: 'Onion (kg)', category: 'raw', stock: '10', min: 2 },
-    { name: 'Cucumber', category: 'raw', stock: '10', min: 2 },
-    { name: 'Chiliflex / Oregano', category: 'raw', stock: '20', min: 5 }
-  ];
+  // Migration logic for old string-based stock to new object-based qty/unit/price
+  if (inv.length > 0 && (typeof inv[0].stock === 'string' || !('price' in inv[0]))) {
+    needsMigration = true;
+    inv = inv.map(item => {
+      const qtyMatch = typeof item.stock === 'string' ? String(item.stock).match(/(\d+)/) : null;
+      const unitMatch = typeof item.stock === 'string' ? String(item.stock).match(/[a-zA-Z]+/) : null;
+      return {
+        ...item,
+        qty: item.qty || (qtyMatch ? parseInt(qtyMatch[0]) : 0),
+        unit: item.unit || (unitMatch ? unitMatch[0] : 'units'),
+        min: parseInt(item.min) || 5,
+        price: parseFloat(item.price) || 0
+      };
+    });
+  }
 
-  setLS('cc_inventory', defaults);
+  if (inv.length === 0) {
+    inv = [
+      { name: 'Blue Lays', category: 'packets', qty: 50, unit: 'packs', min: 10, price: 10 },
+      { name: 'Yellow Lays', category: 'packets', qty: 50, unit: 'packs', min: 10, price: 10 },
+      { name: 'Dark Yellow Lays', category: 'packets', qty: 50, unit: 'packs', min: 10, price: 10 },
+      { name: 'Tedhe Medhe', category: 'packets', qty: 50, unit: 'packs', min: 10, price: 20 },
+      { name: 'Kurkure Red', category: 'packets', qty: 50, unit: 'packs', min: 10, price: 20 },
+      { name: 'Tandoori Mayo', category: 'sauces', qty: 5, unit: 'bottles', min: 2, price: 150 },
+      { name: 'White Mayo', category: 'sauces', qty: 5, unit: 'bottles', min: 2, price: 120 },
+      { name: 'Schezwan Sauce', category: 'sauces', qty: 5, unit: 'bottles', min: 2, price: 95 },
+      { name: 'Sweet Corn Packets', category: 'raw', qty: 20, unit: 'packs', min: 5, price: 40 },
+      { name: 'Onion (kg)', category: 'raw', qty: 10, unit: 'kg', min: 2, price: 30 },
+      { name: 'Cucumber', category: 'raw', qty: 10, unit: 'units', min: 2, price: 15 },
+      { name: 'Chiliflex / Oregano', category: 'raw', qty: 20, unit: 'packs', min: 5, price: 5 }
+    ];
+    needsMigration = true;
+  }
+
+  if (needsMigration) setLS('cc_inventory', inv);
+  renderInvLog();
 }
 
 // Initializing
@@ -361,92 +380,253 @@ $('#adminCalPrev').addEventListener('click', () => { adminCalDate.setMonth(admin
 $('#adminCalNext').addEventListener('click', () => { adminCalDate.setMonth(adminCalDate.getMonth()+1); renderAdminCalendar(); });
 
 /* ============================================================
-   6. INVENTORY MANAGEMENT
+   6. PROFESSIONAL INVENTORY MANAGEMENT — PHASE 2
    ============================================================ */
 function renderInventory() {
   const inv = getLS('cc_inventory', []);
   const list = $('#inventoryList');
-  const lowStockEl = $('#lowStockCount');
+  const query = ($('#invSearchInput').value || '').toLowerCase();
+  const catFilter = $('#invCategoryFilter').value || 'all';
   
   if (!list) return;
-  
+
+  // 1. Calculate Dash Stats
+  let totalItems = inv.length;
   let lowCount = 0;
+  let outCount = 0;
+  let totalUnits = 0;
+  let totalValue = 0;
+
+  inv.forEach(item => {
+    const qty = parseFloat(item.qty) || 0;
+    const price = parseFloat(item.price) || 0;
+    totalUnits += qty;
+    totalValue += (qty * price);
+    if (qty <= 0) outCount++;
+    else if (qty <= (item.min || 0)) lowCount++;
+  });
+
+  $('#invStatTotal').textContent = totalItems;
+  $('#invStatLow').textContent = lowCount;
+  $('#invStatOut').textContent = outCount;
+  $('#invStatValue').textContent = totalUnits;
+  $('#invStatValTotal').textContent = `₹${totalValue.toLocaleString('en-IN')}`;
+
+  // 2. Filter logic
+  const filtered = inv.map((item, originalIndex) => ({ ...item, originalIndex }))
+    .filter(item => {
+      const matchesSearch = item.name.toLowerCase().includes(query);
+      const matchesCat = catFilter === 'all' || item.category === catFilter;
+      return matchesSearch && matchesCat;
+    });
   
-  if (inv.length === 0) {
-    list.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:40px; color:#666;">No inventory items yet. Add your first item!</td></tr>';
-    lowStockEl.textContent = 0;
+  if (filtered.length === 0) {
+    list.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:60px; color:var(--text-muted);">
+      <div style="font-size:32px; margin-bottom:10px;">🔍</div>
+      No items found matching your filters.
+    </td></tr>`;
     return;
   }
 
-  list.innerHTML = inv.map((item, i) => {
-    const current = parseFloat(item.stock) || 0;
-    const min = parseFloat(item.min) || 0;
-    const isLow = current <= min;
-    if (isLow) lowCount++;
+  // 3. Render Table
+  list.innerHTML = filtered.map((item) => {
+    const qty = item.qty || 0;
+    const min = item.min || 0;
+    const healthPercent = Math.min(100, (qty / (min * 3)) * 100); 
+    let healthColor = 'var(--green)';
+    if (qty <= 0) healthColor = '#ff4444';
+    else if (qty <= min) healthColor = 'var(--orange)';
+
+    const catIconClass = `cat-icon-${item.category}`;
 
     return `
-      <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
-        <td style="padding:12px;"><strong>${escHtml(item.name)}</strong></td>
-        <td style="padding:12px;"><span style="font-size:11px; text-transform:uppercase; opacity:0.6;">${item.category}</span></td>
-        <td style="padding:12px;">${item.stock}</td>
-        <td style="padding:12px;">
-          <span style="padding:4px 8px; border-radius:4px; font-size:11px; font-weight:800; ${isLow ? 'background:rgba(233,30,30,0.15); color:#f87171;' : 'background:rgba(0,200,100,0.1); color:#4ade80;'}">
-            ${isLow ? '🔴 LOW STOCK' : '🟢 IN STOCK'}
-          </span>
+      <tr>
+        <td style="padding:16px 12px; text-align:center;">
+          <div class="is-icon" style="width:36px; height:36px; font-size:18px; ${catIconClass}">
+            ${item.category === 'packets' ? '🍿' : item.category === 'sauces' ? '🧴' : '🥬'}
+          </div>
         </td>
-        <td style="padding:12px;">
-          <button class="btn-admin btn-sm btn-ghost" onclick="editInvItem(${i})">✏️</button>
-          <button class="btn-admin btn-sm btn-ghost" style="color:#f87171;" onclick="deleteInvItem(${i})">🗑️</button>
+        <td style="padding:16px 12px;">
+          <div style="font-weight:800; color:#fff;">${escHtml(item.name)}</div>
+          <div style="font-size:10px; opacity:0.5; text-transform:uppercase;">₹${item.price || 0}/unit</div>
+        </td>
+        <td style="padding:16px 12px;"><span class="badge" style="background:rgba(255,255,255,0.05);">${item.category.toUpperCase()}</span></td>
+        <td style="padding:16px 12px;">
+          <div class="stock-health-container">
+            <div class="sh-text">
+              <span style="color:${healthColor}">${qty} ${item.unit}</span>
+              <span style="opacity:0.4;">min: ${min}</span>
+            </div>
+            <div class="stock-health-bar">
+              <div class="sh-fill" style="width:${healthPercent}%; background:${healthColor}"></div>
+            </div>
+          </div>
+        </td>
+        <td style="padding:16px 12px;">
+          <div class="stock-adj-wrap">
+            <button class="btn-adj" onclick="updateStockQty(${item.originalIndex}, -1)">−</button>
+            <span class="adj-val">${qty}</span>
+            <button class="btn-adj" onclick="updateStockQty(${item.originalIndex}, 1)">+</button>
+          </div>
+        </td>
+        <td style="padding:16px 12px;">
+          <button class="btn-admin btn-sm btn-ghost" onclick="editInvItem(${item.originalIndex})">✏️ Edit</button>
+          <button class="btn-admin btn-sm btn-ghost" style="color:#f87171;" onclick="deleteInvItem(${item.originalIndex})">🗑️</button>
         </td>
       </tr>
     `;
   }).join('');
-  
-  lowStockEl.textContent = lowCount;
 }
 
-$('#addInvBtn').addEventListener('click', () => {
-  $('#addInvForm').reset();
-  $('#inv-id').value = '';
-  $('#addInvFormWrap').style.display = 'block';
-});
-
-$('#cancelInvBtn').addEventListener('click', () => {
-  $('#addInvFormWrap').style.display = 'none';
-});
-
-$('#addInvForm').addEventListener('submit', (e) => {
-  e.preventDefault();
-  const idStr = $('#inv-id').value;
-  const items = getLS('cc_inventory', []);
+// LOGGING SYSTEM
+function logInvChange(name, delta, newQty) {
+  const logs = getLS('cc_inventory_log', []);
+  const type = delta > 0 ? 'positive' : 'negative';
+  const icon = delta > 0 ? '📈' : '📉';
   
-  const newItem = {
-    name: $('#inv-name').value,
-    category: $('#inv-category').value,
-    stock: $('#inv-stock').value,
-    min: $('#inv-min').value
-  };
+  logs.unshift({
+    id: Date.now(),
+    name,
+    change: Math.abs(delta),
+    newQty,
+    type,
+    icon,
+    time: new Date().toISOString()
+  });
+  
+  setLS('cc_inventory_log', logs.slice(0, 15)); // Keep last 15
+  renderInvLog();
+}
 
-  if (idStr !== '') {
-    items[parseInt(idStr)] = newItem;
-  } else {
-    items.push(newItem);
+function renderInvLog() {
+  const logs = getLS('cc_inventory_log', []);
+  const container = $('#invActivityLog');
+  if (!container) return;
+
+  if (logs.length === 0) {
+    container.innerHTML = `<p style="color:var(--text-muted); font-size:13px;">No recent changes recorded.</p>`;
+    return;
   }
 
+  container.innerHTML = logs.map(l => {
+    const time = new Date(l.time).toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' });
+    return `
+      <div class="log-item ${l.type}">
+        <div class="log-icon">${l.icon}</div>
+        <div class="log-content">
+          <div class="log-header">
+            <strong>${escHtml(l.name)}</strong>
+            <span class="log-time">${time}</span>
+          </div>
+          <div class="log-msg">
+            ${l.type === 'positive' ? 'Restocked' : 'Sold/Used'} ${l.change} units. Current: <span class="log-stock-info">${l.newQty}</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+if ($('#clearInvLogBtn')) {
+  $('#clearInvLogBtn').addEventListener('click', () => {
+    if (confirm('Clear the activity log?')) {
+      setLS('cc_inventory_log', []);
+      renderInvLog();
+    }
+  });
+}
+
+window.updateStockQty = (idx, delta) => {
+  const items = getLS('cc_inventory', []);
+  const item = items[idx];
+  item.qty = Math.max(0, (parseFloat(item.qty) || 0) + delta);
   setLS('cc_inventory', items);
-  $('#addInvFormWrap').style.display = 'none';
+  logInvChange(item.name, delta, item.qty);
   renderInventory();
-  showToast('📦 Inventory updated!');
-});
+};
+
+if ($('#invSearchInput')) $('#invSearchInput').addEventListener('input', renderInventory);
+if ($('#invCategoryFilter')) $('#invCategoryFilter').addEventListener('change', renderInventory);
+if ($('#reorderInvBtn')) $('#reorderInvBtn').addEventListener('click', generateReorderWhatsAppList);
+
+function generateReorderWhatsAppList() {
+  const inv = getLS('cc_inventory', []);
+  const low = inv.filter(item => (parseFloat(item.qty) || 0) <= (parseFloat(item.min) || 5));
+  
+  if (low.length === 0) {
+    alert('✅ High Stock Levels! No items currently need reordering.');
+    return;
+  }
+
+  let msg = `🛒 *CRIPSY CORNER: URGENT SHOPPING LIST*\n`;
+  msg += `━━━━━━━━━━━━━━━━━━━━\n`;
+  low.forEach(item => {
+    msg += `• *${item.name}*: ${item.qty} ${item.unit} left (Min: ${item.min})\n`;
+  });
+  msg += `━━━━━━━━━━━━━━━━━━━━\n`;
+  msg += `📅 _Generated: ${new Date().toLocaleDateString('en-IN')}_\n`;
+  
+  window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+}
+
+if ($('#addInvBtn')) {
+  $('#addInvBtn').addEventListener('click', () => {
+    $('#addInvForm').reset();
+    $('#inv-id').value = '';
+    $('#invFormTitle').textContent = '➕ Add New Inventory Item';
+    $('#addInvFormWrap').style.display = 'block';
+  });
+}
+
+if ($('#cancelInvBtn')) {
+  $('#cancelInvBtn').addEventListener('click', () => {
+    $('#addInvFormWrap').style.display = 'none';
+  });
+}
+
+if ($('#addInvForm')) {
+  $('#addInvForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const idStr = $('#inv-id').value;
+    const items = getLS('cc_inventory', []);
+    
+    const newItem = {
+      name: $('#inv-name').value,
+      category: $('#inv-category').value,
+      qty: parseFloat($('#inv-qty').value) || 0,
+      unit: $('#inv-unit').value,
+      min: parseFloat($('#inv-min').value) || 0,
+      price: parseFloat($('#inv-price').value) || 0
+    };
+
+    if (idStr !== '') {
+      const oldQty = items[parseInt(idStr)].qty;
+      const diff = newItem.qty - oldQty;
+      items[parseInt(idStr)] = newItem;
+      if (diff !== 0) logInvChange(newItem.name, diff, newItem.qty);
+    } else {
+      items.push(newItem);
+      logInvChange(newItem.name, newItem.qty, newItem.qty);
+    }
+
+    setLS('cc_inventory', items);
+    $('#addInvFormWrap').style.display = 'none';
+    renderInventory();
+    showToast('📦 Inventory professional suite updated!');
+  });
+}
 
 window.editInvItem = (i) => {
   const items = getLS('cc_inventory', []);
   const item = items[i];
   $('#inv-id').value = i;
+  $('#invFormTitle').textContent = '✏️ Edit Inventory Item';
   $('#inv-name').value = item.name;
   $('#inv-category').value = item.category;
-  $('#inv-stock').value = item.stock;
+  $('#inv-qty').value = item.qty;
+  $('#inv-unit').value = item.unit;
   $('#inv-min').value = item.min;
+  $('#inv-price').value = item.price || 0;
   $('#addInvFormWrap').style.display = 'block';
   $('#addInvFormWrap').scrollIntoView({ behavior: 'smooth' });
 };
@@ -454,10 +634,35 @@ window.editInvItem = (i) => {
 window.deleteInvItem = (i) => {
   if (!confirm('Delete this item from inventory?')) return;
   const items = getLS('cc_inventory', []);
+  const name = items[i].name;
   items.splice(i, 1);
   setLS('cc_inventory', items);
+  showToast(`🗑️ ${name} deleted.`);
   renderInventory();
 };
+
+if ($('#exportInvBtn')) {
+  $('#exportInvBtn').addEventListener('click', () => {
+    const inv = getLS('cc_inventory', []);
+    if (inv.length === 0) { alert('No inventory to export!'); return; }
+
+    let csv = 'Item Name,Category,Quantity,Unit,Min Level,Price,Total Value\n';
+    inv.forEach(item => {
+      const total = (item.qty || 0) * (item.price || 0);
+      csv += `"${item.name}","${item.category}",${item.qty},"${item.unit}",${item.min},${item.price},${total}\n`;
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.setAttribute('hidden', '');
+    a.setAttribute('href', url);
+    a.setAttribute('download', `cripsy_inventory_PRO_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  });
+}
 
 /* ============================================================
    7. GALLERY MANAGER
