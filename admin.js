@@ -70,6 +70,7 @@ $$('.sb-link').forEach(btn => {
       case 'dashboard': loadDashboard(); break;
       case 'bookings': loadBookings(); break;
       case 'calendar': renderAdminCalendar(); break;
+      case 'inventory': renderInventory(); break;
       case 'gallery': loadGallery(); break;
       case 'contact': loadContactInfo(); break;
     }
@@ -158,15 +159,16 @@ function buildBookingCard(b, compact) {
         <div class="bc-detail"><strong>📅 Event Date</strong>${b.eventDate}</div>
         <div class="bc-detail"><strong>📍 Location</strong>${escHtml(b.location)}</div>
         <div class="bc-detail"><strong>👥 People</strong>~${b.people}</div>
+        ${b.stallFee ? `<div class="bc-detail"><strong>💰 Stall Fee</strong>₹${escHtml(b.stallFee)}</div>` : ''}
       </div>
       ${b.message ? `<div class="bc-message">"${escHtml(b.message)}"</div>` : ''}
       ${!compact ? `
       <div class="bc-actions">
-        ${b.status !== 'confirmed' ? `<button class="btn-admin btn-sm btn-confirm" data-action="confirm" data-id="${b.id}">✅ Confirm</button>` : ''}
-        ${b.status !== 'rejected'  ? `<button class="btn-admin btn-sm btn-reject"  data-action="reject"  data-id="${b.id}">❌ Reject</button>` : ''}
+        <button class="btn-admin btn-sm btn-confirm" data-action="confirm" data-id="${b.id}">✅ Confirm</button>
+        <button class="btn-admin btn-sm btn-reject"  data-action="reject"  data-id="${b.id}">❌ Reject</button>
         <button class="btn-admin btn-sm btn-delete" data-action="delete" data-id="${b.id}">🗑️ Delete</button>
-        <a href="https://wa.me/${b.phone.replace(/\D/g,'')}?text=Hi ${encodeURIComponent(b.name)}! Thank you for your interest in Cripsy Corner. We'd love to discuss your event booking for ${b.eventDate}." target="_blank" class="btn-admin btn-sm btn-ghost">💬 WhatsApp</a>
-        <a href="mailto:${b.email}?subject=Cripsy Corner - Event Booking&body=Hi ${encodeURIComponent(b.name)}," target="_blank" class="btn-admin btn-sm btn-ghost">✉️ Email</a>
+        <button class="btn-admin btn-sm btn-primary" data-action="notify-team" data-id="${b.id}">📢 Notify Team</button>
+        <a href="https://wa.me/${b.phone.replace(/\D/g,'')}?text=Hi ${encodeURIComponent(b.name)}! We've received your booking request for ${b.eventDate}. We're excited to discuss this with you!" target="_blank" class="btn-admin btn-sm btn-ghost">💬 WhatsApp Customer</a>
       </div>` : ''}
     </div>
   `;
@@ -182,14 +184,86 @@ function attachBookingActions(container) {
       if (action === 'delete') {
         if (!confirm('Delete this booking request?')) return;
         bookings = bookings.filter(b => b.id !== id);
+      } else if (action === 'notify-team') {
+        notifyTeam(id);
+        return;
       } else {
         bookings = bookings.map(b => b.id === id ? { ...b, status: action === 'confirm' ? 'confirmed' : 'rejected' } : b);
+        if (action === 'confirm' || action === 'reject') {
+          const b = bookings.find(item => item.id === id);
+          notifyCustomerStatus(b);
+        }
       }
       setLS('cc_bookings', bookings);
       loadBookings();
       loadDashboard();
     });
   });
+}
+
+// Notify Team link
+function notifyTeam(id) {
+  const b = getLS('cc_bookings', []).find(item => item.id === id);
+  const info = getLS('cc_contact_info', {});
+  if (!b) return;
+
+  const msg = `🔔 *CRIPSY CORNER: NEW EVENT BOOKING!*
+━━━━━━━━━━━━━━
+👤 *CLIENT:* ${b.name}
+📅 *DATE:* ${b.eventDate}
+📍 *VENUE:* ${b.location}
+💰 *STALL FEE:* ₹${b.stallFee || '0'}
+👥 *CROWD:* ~${b.people} People
+━━━━━━━━━━━━━━
+Please check the Admin Panel to update inventory and confirm our availability! ✨🌶️`;
+
+  // For static web, we open the WhatsApp link for the current admin to send to the group or their numbers.
+  // Mentioning team members specifically if numbers are set.
+  const teamMsg = `📢 Hey Team! We've got a new request from ${b.name}. Check the details below.`;
+  
+  window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+}
+
+// ------------------------------------------------------------
+// INVENTORY PRE-POPULATION
+// ------------------------------------------------------------
+function prePopulateInventory() {
+  const inv = getLS('cc_inventory', []);
+  if (inv.length > 0) return; // Only populate if empty
+
+  const defaults = [
+    { name: 'Blue Lays', category: 'packets', stock: '50', min: 10 },
+    { name: 'Yellow Lays', category: 'packets', stock: '50', min: 10 },
+    { name: 'Dark Yellow Lays', category: 'packets', stock: '50', min: 10 },
+    { name: 'Tedhe Medhe', category: 'packets', stock: '50', min: 10 },
+    { name: 'Kurkure Red', category: 'packets', stock: '50', min: 10 },
+    { name: 'Kurkure Green', category: 'packets', stock: '50', min: 10 },
+    { name: 'Mexilla (Yellow/Red)', category: 'packets', stock: '50', min: 10 },
+    { name: 'Tandoori Mayo', category: 'sauces', stock: '5 units', min: 2 },
+    { name: 'White Mayo', category: 'sauces', stock: '5 units', min: 2 },
+    { name: 'Schezwan Sauce', category: 'sauces', stock: '5 units', min: 2 },
+    { name: 'Sweet Corn Packets', category: 'raw', stock: '20', min: 5 },
+    { name: 'Onion (kg)', category: 'raw', stock: '10', min: 2 },
+    { name: 'Cucumber', category: 'raw', stock: '10', min: 2 },
+    { name: 'Chiliflex / Oregano', category: 'raw', stock: '20', min: 5 }
+  ];
+
+  setLS('cc_inventory', defaults);
+}
+
+// Initializing
+document.addEventListener('DOMContentLoaded', () => {
+  prePopulateInventory();
+  // Existing init logic...
+});
+
+function notifyCustomerStatus(b) {
+  const status = b.status === 'confirmed' ? '✅ *ACCEPTED*' : '❌ *REJECTED*';
+  const msg = `Hi ${b.name}! Your booking request for Cripsy Corner on ${b.eventDate} has been ${status}. 
+
+${b.status === 'confirmed' ? 'We will contact you shortly to discuss further details. Get ready for some Cripsy magic! 🌶️✨' : 'Unfortunately, we are unavailable or unable to host a stall at this event. Thank you for your interest!'}`;
+  
+  window.open(`https://wa.me/${b.phone.replace(/\D/g,'')}?text=${encodeURIComponent(msg)}`, '_blank');
 }
 
 $('#clearBookingsBtn').addEventListener('click', () => {
@@ -287,7 +361,106 @@ $('#adminCalPrev').addEventListener('click', () => { adminCalDate.setMonth(admin
 $('#adminCalNext').addEventListener('click', () => { adminCalDate.setMonth(adminCalDate.getMonth()+1); renderAdminCalendar(); });
 
 /* ============================================================
-   6. GALLERY MANAGER
+   6. INVENTORY MANAGEMENT
+   ============================================================ */
+function renderInventory() {
+  const inv = getLS('cc_inventory', []);
+  const list = $('#inventoryList');
+  const lowStockEl = $('#lowStockCount');
+  
+  if (!list) return;
+  
+  let lowCount = 0;
+  
+  if (inv.length === 0) {
+    list.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:40px; color:#666;">No inventory items yet. Add your first item!</td></tr>';
+    lowStockEl.textContent = 0;
+    return;
+  }
+
+  list.innerHTML = inv.map((item, i) => {
+    const current = parseFloat(item.stock) || 0;
+    const min = parseFloat(item.min) || 0;
+    const isLow = current <= min;
+    if (isLow) lowCount++;
+
+    return `
+      <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+        <td style="padding:12px;"><strong>${escHtml(item.name)}</strong></td>
+        <td style="padding:12px;"><span style="font-size:11px; text-transform:uppercase; opacity:0.6;">${item.category}</span></td>
+        <td style="padding:12px;">${item.stock}</td>
+        <td style="padding:12px;">
+          <span style="padding:4px 8px; border-radius:4px; font-size:11px; font-weight:800; ${isLow ? 'background:rgba(233,30,30,0.15); color:#f87171;' : 'background:rgba(0,200,100,0.1); color:#4ade80;'}">
+            ${isLow ? '🔴 LOW STOCK' : '🟢 IN STOCK'}
+          </span>
+        </td>
+        <td style="padding:12px;">
+          <button class="btn-admin btn-sm btn-ghost" onclick="editInvItem(${i})">✏️</button>
+          <button class="btn-admin btn-sm btn-ghost" style="color:#f87171;" onclick="deleteInvItem(${i})">🗑️</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+  
+  lowStockEl.textContent = lowCount;
+}
+
+$('#addInvBtn').addEventListener('click', () => {
+  $('#addInvForm').reset();
+  $('#inv-id').value = '';
+  $('#addInvFormWrap').style.display = 'block';
+});
+
+$('#cancelInvBtn').addEventListener('click', () => {
+  $('#addInvFormWrap').style.display = 'none';
+});
+
+$('#addInvForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const idStr = $('#inv-id').value;
+  const items = getLS('cc_inventory', []);
+  
+  const newItem = {
+    name: $('#inv-name').value,
+    category: $('#inv-category').value,
+    stock: $('#inv-stock').value,
+    min: $('#inv-min').value
+  };
+
+  if (idStr !== '') {
+    items[parseInt(idStr)] = newItem;
+  } else {
+    items.push(newItem);
+  }
+
+  setLS('cc_inventory', items);
+  $('#addInvFormWrap').style.display = 'none';
+  renderInventory();
+  showToast('📦 Inventory updated!');
+});
+
+window.editInvItem = (i) => {
+  const items = getLS('cc_inventory', []);
+  const item = items[i];
+  $('#inv-id').value = i;
+  $('#inv-name').value = item.name;
+  $('#inv-category').value = item.category;
+  $('#inv-stock').value = item.stock;
+  $('#inv-min').value = item.min;
+  $('#addInvFormWrap').style.display = 'block';
+  $('#addInvFormWrap').scrollIntoView({ behavior: 'smooth' });
+};
+
+window.deleteInvItem = (i) => {
+  if (!confirm('Delete this item from inventory?')) return;
+  const items = getLS('cc_inventory', []);
+  items.splice(i, 1);
+  setLS('cc_inventory', items);
+  renderInventory();
+};
+
+/* ============================================================
+   7. GALLERY MANAGER
    ============================================================ */
 let pendingFiles = []; // Array of { file, dataUrl, caption, type }
 
@@ -430,11 +603,15 @@ $('#cancelUploadBtn').addEventListener('click', () => {
    ============================================================ */
 function loadContactInfo() {
   const info = getLS('cc_contact', {});
-  if (info.phone) $('#ci-phone').value = info.phone;
-  if (info.whatsapp) $('#ci-whatsapp').value = info.whatsapp;
-  if (info.email) $('#ci-email').value = info.email;
-  if (info.instagram) $('#ci-instagram').value = info.instagram;
-  if (info.city) $('#ci-city').value = info.city;
+  $('#ci-phone').value = info.phone || '';
+  $('#ci-whatsapp').value = info.whatsapp || '';
+  $('#ci-email').value = info.email || '';
+  $('#ci-instagram').value = info.instagram || '';
+  $('#ci-city').value = info.city || '';
+  $('#ci-team1').value = info.team1 || '';
+  $('#ci-team2').value = info.team2 || '';
+  $('#ci-team3').value = info.team3 || '';
+
   renderContactSnippet(info);
 }
 
@@ -446,13 +623,16 @@ $('#contactFormAdmin').addEventListener('submit', (e) => {
     email: $('#ci-email').value,
     instagram: $('#ci-instagram').value,
     city: $('#ci-city').value,
+    team1: $('#ci-team1').value,
+    team2: $('#ci-team2').value,
+    team3: $('#ci-team3').value
   };
   setLS('cc_contact', info);
   const note = $('#contactSavedNote');
   note.style.display = 'block';
   setTimeout(() => note.style.display = 'none', 3000);
   renderContactSnippet(info);
-  showToast('✅ Contact info saved!');
+  showToast('✅ Contact & Team info saved!');
 });
 
 function renderContactSnippet(info) {
@@ -463,6 +643,12 @@ function renderContactSnippet(info) {
     <div>✉️ <strong>Email:</strong> ${info.email || '—'}</div>
     <div>📸 <strong>Instagram:</strong> ${info.instagram || '—'}</div>
     <div>📍 <strong>City:</strong> ${info.city || '—'}</div>
+    <div style="margin-top:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.05);">
+      <strong>👥 Team Members:</strong><br/>
+      1: ${info.team1 || '—'}<br/>
+      2: ${info.team2 || '—'}<br/>
+      3: ${info.team3 || '—'}
+    </div>
     <br/>
     <small style="color:#666;">Update these in your index.html file manually for the website to reflect the changes.</small>
   `;
