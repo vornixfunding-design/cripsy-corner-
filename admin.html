@@ -48,6 +48,7 @@
         <button class="sb-link" data-panel="calendar">📅 Availability</button>
         <button class="sb-link" data-panel="inventory">📦 Inventory</button>
         <button class="sb-link" data-panel="gallery">🖼️ Gallery</button>
+        <button class="sb-link" data-panel="finance">💰 Finance</button>
         <button class="sb-link" data-panel="contact">📞 Contact Info</button>
         <button class="sb-link" data-panel="settings">⚙️ Settings</button>
       </nav>
@@ -90,9 +91,9 @@
             <div class="ds-label">Confirmed</div>
           </div>
           <div class="dash-stat">
-            <div class="ds-icon">🖼️</div>
-            <div class="ds-num" id="dsGallery">0</div>
-            <div class="ds-label">Gallery Items</div>
+            <div class="ds-icon">💰</div>
+            <div class="ds-num" id="dsFinancialHealth">₹0</div>
+            <div class="ds-label">Total Asset Value</div>
           </div>
         </div>
 
@@ -100,6 +101,140 @@
           <h2>Recent Booking Requests</h2>
           <div id="dashRecentList" class="booking-list"></div>
         </div>
+      </div>
+
+      <!-- ===== FINANCE PANEL ===== -->
+      <div class="panel" id="panel-finance">
+        <div class="panel-header" style="display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:16px;">
+          <div>
+            <h1>💰 Financial Suite</h1>
+            <p>Track investments, sales, and account balances for Cripsy Corner.</p>
+          </div>
+          <div class="header-actions" style="display:flex; gap:12px;">
+            <button class="btn-admin btn-ghost" id="exportFinLog">📥 Export Ledger</button>
+            <button class="btn-admin btn-danger" id="newProgramBtn">🧹 Start New Program</button>
+          </div>
+        </div>
+
+        <!-- 1. Financial Summary Cards -->
+        <div class="inv-stats-grid">
+          <div class="inv-stat-card">
+            <div class="is-icon" style="background:rgba(251,191,36,0.1); color:#fbbf24;">👤</div>
+            <div class="is-info">
+              <span class="is-label">Active Investment</span>
+              <div class="is-value" id="finTotalInvestment">₹0</div>
+            </div>
+          </div>
+          <div class="inv-stat-card">
+            <div class="is-icon" style="background:rgba(34,197,94,0.1); color:#22c55e;">📈</div>
+            <div class="is-info">
+              <span class="is-label">Total Session Sales</span>
+              <div class="is-value" id="finTotalSales">₹0</div>
+            </div>
+          </div>
+          <div class="inv-stat-card">
+            <div class="is-icon" style="background:rgba(239,68,68,0.1); color:#ef4444;">📉</div>
+            <div class="is-info">
+              <span class="is-label">Total Session Expenses</span>
+              <div class="is-value" id="finTotalExpenses">₹0</div>
+            </div>
+          </div>
+          <div class="inv-stat-card">
+            <div class="is-icon" style="background:rgba(255,122,0,0.1); color:var(--orange);">📦</div>
+            <div class="is-info">
+              <span class="is-label">Current Stock Asset</span>
+              <div class="is-value" id="finStockAsset">₹0</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Account Status Grid -->
+        <h2 style="margin:20px 0 16px; font-size:18px;">🏦 Account Balances</h2>
+        <div class="inv-stats-grid" id="financeAccountsGrid">
+           <!-- Placeholder for adding new accounts -->
+           <div class="inv-stat-card" style="border-style: dashed; justify-content:center; cursor:pointer;" id="addFinAccountBtn">
+             <div style="text-align:center; opacity:0.6;">
+               <div style="font-size:20px;">➕</div>
+               <div style="font-size:11px; font-weight:700; text-transform:uppercase; margin-top:4px;">Add Account</div>
+             </div>
+           </div>
+        </div>
+
+        <!-- 3. Transaction Console & Ledger -->
+        <div class="finance-main-grid" id="finMainGrid" style="display:grid; grid-template-columns: 350px 1fr; gap:24px; margin-top:30px;">
+          
+          <!-- Left: Transaction Form -->
+          <div class="upload-form" style="margin-top:0; height:fit-content;">
+            <h3>🖊️ Log Transaction</h3>
+            <form id="addTransactionForm" class="contact-form-admin" style="display:flex; flex-direction:column; gap:16px;">
+              <div class="form-group-admin">
+                <label>Transaction Type</label>
+                <select id="fin-type" class="admin-select" required>
+                  <option value="income">📈 Sale / Income</option>
+                  <option value="expense">📉 Expense / Purchase</option>
+                  <option value="investment">👤 Capital Investment</option>
+                </select>
+              </div>
+              <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                <div class="form-group-admin">
+                  <label>Amount (₹)</label>
+                  <input type="number" id="fin-amount" placeholder="500" required />
+                </div>
+                <div class="form-group-admin">
+                  <label>Date</label>
+                  <input type="date" id="fin-date" required />
+                </div>
+              </div>
+              <div class="form-group-admin">
+                <label>Target Account</label>
+                <select id="fin-account" class="admin-select" required>
+                  <!-- Dynamically populated -->
+                </select>
+              </div>
+              <div class="form-group-admin" id="fin-member-wrap" style="display:none;">
+                <label>Investor (For Investments)</label>
+                <select id="fin-member" class="admin-select">
+                  <option value="Jatin">Jatin</option>
+                  <option value="Aalekh">Aalekh</option>
+                  <option value="Siddharth">Siddharth</option>
+                  <option value="other">Other / Business</option>
+                </select>
+              </div>
+              <div class="form-group-admin">
+                <label>Description</label>
+                <input type="text" id="fin-desc" placeholder="e.g. Sales at Event X" required />
+              </div>
+              <button type="submit" class="btn-admin btn-primary" style="width:100%; margin-top:10px;">Record Transaction 🚀</button>
+            </form>
+          </div>
+
+          <!-- Right: History Ledger -->
+          <div class="inventory-table-wrap">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+              <h3 style="margin:0;">📜 Transaction Ledger</h3>
+              <div class="inv-search-wrap" style="max-width:250px;">
+                <input type="text" id="finSearchLedger" placeholder="Search transactions..." />
+              </div>
+            </div>
+            <table class="luxury-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Description</th>
+                  <th>Account</th>
+                  <th>Type</th>
+                  <th>Amount</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="transactionLedgerBody">
+                <!-- Rows injected by JS -->
+              </tbody>
+            </table>
+          </div>
+
+        </div>
+
       </div>
 
       <!-- ===== BOOKINGS ===== -->
