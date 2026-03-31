@@ -7,28 +7,20 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Nunito:wght@400;600;700;800;900&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   
-  <!-- 🔥 Firebase SDKs (v9 Compat) -->
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+  <!-- 🐘 Supabase SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <!-- Firebase Configuration Placeholder -->
+  <!-- Supabase Configuration Placeholder -->
   <script>
-    const firebaseConfig = {
-      apiKey: "PASTE_YOUR_API_KEY_HERE",
-      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-      projectId: "YOUR_PROJECT_ID",
-      storageBucket: "YOUR_PROJECT_ID.appspot.com",
-      messagingSenderId: "YOUR_SENDER_ID",
-      appId: "YOUR_APP_ID"
-    };
-    // Initialize Firebase only if keys are present
-    if (firebaseConfig.apiKey !== "PASTE_YOUR_API_KEY_HERE") {
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore();
-        console.log("🔥 Firebase Cloud Sync Active");
+    const supabaseUrl = "https://dvybbidcozjrfhrzafxi.supabase.co";
+    const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2eWJiaWRjb3pqcmZocnphZnhpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5Nzg2OTgsImV4cCI6MjA5MDU1NDY5OH0.bU1Xp_BWoY4J9niJxYd7vrIIN1hFfEecNoXKjYk9Qm0";
+    
+    let supabase = null;
+    if (supabaseUrl !== "PASTE_YOUR_SUPABASE_URL_HERE") {
+        supabase = supabasejs.createClient(supabaseUrl, supabaseKey);
+        console.log("🐘 Supabase Cloud Sync Active");
     } else {
-        console.warn("⚠️ Firebase keys missing. Running in Local Mode.");
+        console.warn("⚠️ Supabase keys missing. Running in Local Mode.");
     }
   </script>
 
