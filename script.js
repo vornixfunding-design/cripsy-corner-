@@ -7,32 +7,44 @@ const $$ = (sel, ctx = document) => [...ctx.querySelectorAll(sel)];
 /* ============================================================
    SUPABASE LIVE SYNC
    ============================================================ */
-const CLOUD_ENABLED = (typeof supabase !== 'undefined' && supabase !== null);
+const CLOUD_ENABLED = (typeof window.sb !== 'undefined' && window.sb !== null);
 
 if (CLOUD_ENABLED) {
   console.log('🐘 Live Home Sync Active');
 
-  // Initial fetch from settings table
-  supabase.from('settings').select('*').then(({ data }) => {
+  // Initial fetch from settings table (last-write-wins guard per key)
+  window.sb.from('settings').select('*').then(({ data }) => {
     if (data) {
       data.forEach(row => {
-        localStorage.setItem(row.key, JSON.stringify(row.value));
+        const tsKey = 'cc_cloud_ts:' + row.key;
+        const remoteTs = row.updated_at || '';
+        const localTs  = localStorage.getItem(tsKey) || '';
+        if (!localTs || remoteTs >= localTs) {
+          localStorage.setItem(row.key, JSON.stringify(row.value));
+          if (remoteTs) localStorage.setItem(tsKey, remoteTs);
+        }
       });
       if (typeof loadContactInfo === 'function') loadContactInfo();
       if (typeof renderCalendar === 'function') renderCalendar();
     }
   });
 
-  // Real-time changes
-  supabase
+  // Real-time changes (last-write-wins guard per key)
+  window.sb
     .channel('home:settings')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, payload => {
       const row = payload.new;
       if (!row) return;
-      localStorage.setItem(row.key, JSON.stringify(row.value));
-      if (row.key === 'cc_contact' && typeof loadContactInfo === 'function') loadContactInfo();
-      if (row.key === 'cc_booked_dates' && typeof renderCalendar === 'function') renderCalendar();
-      if (row.key === 'cc_gallery') loadAdminGallery();
+      const tsKey = 'cc_cloud_ts:' + row.key;
+      const remoteTs = row.updated_at || '';
+      const localTs  = localStorage.getItem(tsKey) || '';
+      if (!localTs || remoteTs >= localTs) {
+        localStorage.setItem(row.key, JSON.stringify(row.value));
+        if (remoteTs) localStorage.setItem(tsKey, remoteTs);
+        if (row.key === 'cc_contact' && typeof loadContactInfo === 'function') loadContactInfo();
+        if (row.key === 'cc_booked_dates' && typeof renderCalendar === 'function') renderCalendar();
+        if (row.key === 'cc_gallery' && typeof loadAdminGallery === 'function') loadAdminGallery();
+      }
     })
     .subscribe();
 }
@@ -290,7 +302,7 @@ if (bookingForm) {
     if (CLOUD_ENABLED) {
       try {
         // Insert into dedicated event_bookings table
-        const { error: insErr } = await supabase.from('event_bookings').insert({
+        const { error: insErr } = await window.sb.from('event_bookings').insert({
           name:        submission.name,
           phone:       submission.phone,
           email:       submission.email,
@@ -306,9 +318,11 @@ if (bookingForm) {
         if (insErr) console.warn('event_bookings insert:', insErr.message);
 
         // Also keep settings table in sync for the admin panel
-        await supabase.from('settings').upsert({
-          key: 'cc_bookings', value: bookings, updated_at: new Date().toISOString()
+        const _nowTs = new Date().toISOString();
+        await window.sb.from('settings').upsert({
+          key: 'cc_bookings', value: bookings, updated_at: _nowTs
         });
+        localStorage.setItem('cc_cloud_ts:cc_bookings', _nowTs);
         console.log('✅ Booking saved to Supabase');
       } catch (err) {
         console.warn('Cloud save failed, local backup used:', err);

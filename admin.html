@@ -10,11 +10,20 @@
   <!-- Supabase SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
-    const supabaseUrl = "https://dvybbidcozjrfhrzafxi.supabase.co";
-    const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2eWJiaWRjb3pqcmZocnphZnhpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5Nzg2OTgsImV4cCI6MjA5MDU1NDY5OH0.bU1Xp_BWoY4J9niJxYd7vrIIN1hFfEecNoXKjYk9Qm0";
-    window.supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
-    window.supabase = window.supabaseClient;
-    console.log("🐘 Supabase Cloud Sync Active");
+    (function () {
+      var _url = "https://dvybbidcozjrfhrzafxi.supabase.co";
+      var _key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2eWJiaWRjb3pqcmZocnphZnhpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5Nzg2OTgsImV4cCI6MjA5MDU1NDY5OH0.bU1Xp_BWoY4J9niJxYd7vrIIN1hFfEecNoXKjYk9Qm0";
+      /* The CDN build may expose the factory as window.supabase or window.supabasejs */
+      var _sdk = (window.supabasejs && window.supabasejs.createClient)
+                   ? window.supabasejs
+                   : (window.supabase && window.supabase.createClient ? window.supabase : null);
+      if (_sdk) {
+        window.sb = _sdk.createClient(_url, _key);
+        console.log('🐘 Supabase Cloud Sync Active');
+      } else {
+        console.warn('⚠️ Supabase SDK not loaded — offline mode.');
+      }
+    })();
   </script>
 
   <link rel="stylesheet" href="admin.css" />
@@ -174,7 +183,7 @@
                 <select id="fin-member" class="admin-select">
                   <option value="Jatin">Jatin</option>
                   <option value="Aalekh">Aalekh</option>
-                  <option value="Siddharth">Siddharth</option>
+                  <option value="Yuvraj">Yuvraj</option>
                   <option value="other">Other / Business</option>
                 </select>
               </div>
@@ -217,6 +226,9 @@
             <option value="confirmed">Confirmed</option>
             <option value="rejected">Rejected</option>
           </select>
+          <button class="btn-admin btn-danger-sm" id="bulkDeletePendingBtn">🗑️ Delete All Pending</button>
+          <button class="btn-admin btn-danger-sm" id="bulkDeleteConfirmedBtn">🗑️ Delete All Confirmed</button>
+          <button class="btn-admin btn-danger-sm" id="bulkDeleteRejectedBtn">🗑️ Delete All Rejected</button>
           <button class="btn-admin btn-danger-sm" id="clearBookingsBtn">🗑️ Clear All</button>
         </div>
         <div id="bookingsList" class="booking-list"></div>
@@ -299,6 +311,7 @@
               <button class="btn-admin btn-ghost" id="exportInvBtn">📥 CSV Report</button>
               <button class="btn-admin btn-primary" id="reorderInvBtn">📢 Reorder List</button>
               <button class="btn-admin btn-primary" id="addInvBtn">➕ Add Item</button>
+              <button class="btn-admin btn-danger-sm" id="resetInventoryBtn">🗑️ Reset to Empty</button>
             </div>
           </div>
           <div id="addInvFormWrap" class="upload-form" style="display:none; margin-top:16px; border:1px solid var(--orange);">
