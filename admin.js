@@ -63,13 +63,19 @@ async function checkAuth() {
 
 $('#loginForm').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const input = $('#adminPass').value;
+  const input = $('#adminPassword').value;
   const correct = await getPassword();
   if (input === correct) {
     sessionStorage.setItem('cc_admin_session', 'active');
     showApp();
   } else {
-    alert('❌ Incorrect password.');
+    const err = $('#loginError');
+    if (err) {
+      err.style.display = 'block';
+      setTimeout(() => err.style.display = 'none', 3000);
+    } else {
+      alert('❌ Incorrect password.');
+    }
   }
 });
 
@@ -132,7 +138,19 @@ async function runMigration() {
 
 async function showApp() {
   $('#loginScreen').style.display = 'none';
-  $('#adminApp').style.display = 'flex';
+  const app = $('#adminApp');
+  if (app) app.style.display = 'flex';
+  
+  // Activate default panel (Dashboard)
+  const dashBtn = $('.sb-link[data-panel="dashboard"]');
+  if (dashBtn) {
+    $$('.sb-link').forEach(b => b.classList.remove('active'));
+    dashBtn.classList.add('active');
+    $$('.panel').forEach(p => p.classList.remove('active'));
+    const dashPanel = $('#panel-dashboard');
+    if (dashPanel) dashPanel.classList.add('active');
+  }
+
   if (SB()) {
     showToast('☁️ Connecting to database...');
     await runMigration();
@@ -156,7 +174,7 @@ function initRealtimeListeners() {
 }
 
 function refreshActivePanel() {
-  const active = $('.nav-btn.active')?.dataset.panel;
+  const active = $('.sb-link.active')?.dataset.panel;
   if (active === 'dashboard') loadDashboard();
   if (active === 'bookings') loadBookings();
   if (active === 'calendar') renderAdminCalendar();
@@ -167,19 +185,22 @@ function refreshActivePanel() {
 }
 
 /* --- Panel Switching --- */
-$$('.nav-btn').forEach(btn => {
+$$('.sb-link').forEach(btn => {
   btn.addEventListener('click', () => {
-    $$('.nav-btn').forEach(b => b.classList.remove('active'));
+    const pane = btn.dataset.panel;
+    if (!pane) return;
+    $$('.sb-link').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     $$('.panel').forEach(p => p.classList.remove('active'));
-    $(`#panel-${btn.dataset.panel}`).classList.add('active');
+    const targetPanel = $(`#panel-${pane}`);
+    if (targetPanel) targetPanel.classList.add('active');
     refreshActivePanel();
     if (window.innerWidth < 1024) $('#sidebar').classList.remove('open');
   });
 });
 
-$('#topbarMenu').addEventListener('click', () => {
-  $('#sidebar').classList.toggle('open');
+$('#topbarMenu')?.addEventListener('click', () => {
+  $('#sidebar')?.classList.toggle('open');
 });
 
 /* ============================================================
