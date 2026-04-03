@@ -213,8 +213,91 @@ $$;
 --    For a production system, replace the anon key with server-side auth.
 -- ============================================================
 
+-- ============================================================
+-- 11. cc_settings_write — Optimistic Concurrency RPC (v2)
+--
+--    This is the canonical write path for all settings.
+--    It replaces direct upsert() calls and prevents stale
+--    devices from overwriting newer cloud data.
+--
+--    Usage (from JS):
+--      const { data } = await window.sb.rpc('cc_settings_write', {
+--        p_key:                 'cc_inventory',
+--        p_value:               { ... },
+--        p_expected_updated_at: '2024-01-01T00:00:00.000Z'   -- or null
+--      });
+--      // data is an array; use data[0]:
+--      // data[0].ok, data[0].conflict, data[0].updated_at, data[0].value
+--
+--    Behavior:
+--      • Row does not exist AND p_expected_updated_at IS NULL
+--          → INSERT and return ok=true (first-write succeeds).
+--      • Row does not exist AND p_expected_updated_at IS NOT NULL
+--          → conflict=true (client thinks row exists but it doesn't).
+--      • Row exists AND updated_at matches p_expected_updated_at
+--          → UPDATE value + bump updated_at=now(), return ok=true.
+--      • Row exists AND updated_at does not match (stale client)
+--          → conflict=true with current server value returned.
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION public.cc_settings_write(
+  p_key                  TEXT,
+  p_value                JSONB,
+  p_expected_updated_at  TIMESTAMPTZ DEFAULT NULL
+)
+RETURNS TABLE (
+  ok         BOOLEAN,
+  conflict   BOOLEAN,
+  updated_at TIMESTAMPTZ,
+  value      JSONB
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_row   settings%ROWTYPE;
+  v_now   TIMESTAMPTZ := NOW();
+BEGIN
+  SELECT * INTO v_row FROM settings WHERE key = p_key;
+
+  IF NOT FOUND THEN
+    IF p_expected_updated_at IS NOT NULL THEN
+      -- Client expected a row that no longer exists → conflict
+      RETURN QUERY SELECT false, true, NULL::TIMESTAMPTZ, NULL::JSONB;
+      RETURN;
+    END IF;
+
+    -- First write: INSERT
+    INSERT INTO settings (key, value, updated_at)
+    VALUES (p_key, p_value, v_now);
+
+    RETURN QUERY SELECT true, false, v_now, p_value;
+    RETURN;
+  END IF;
+
+  -- Row exists: check optimistic concurrency
+  IF p_expected_updated_at IS NULL OR v_row.updated_at IS DISTINCT FROM p_expected_updated_at THEN
+    -- Stale client — return current server state without writing
+    RETURN QUERY SELECT false, true, v_row.updated_at, v_row.value;
+    RETURN;
+  END IF;
+
+  -- Timestamps match → safe to update
+  UPDATE settings
+  SET value = p_value, updated_at = v_now
+  WHERE key = p_key;
+
+  RETURN QUERY SELECT true, false, v_now, p_value;
+END;
+$$;
+
+-- Grant execute to both anon (public website) and authenticated roles
+GRANT EXECUTE ON FUNCTION public.cc_settings_write(TEXT, JSONB, TIMESTAMPTZ) TO anon;
+GRANT EXECUTE ON FUNCTION public.cc_settings_write(TEXT, JSONB, TIMESTAMPTZ) TO authenticated;
+
 -- Done! ✅
 -- event_bookings table is ready for booking form submissions
 -- settings table handles: inventory, gallery, calendar, contact, finance
 -- updated_at trigger ensures last-write-wins sync works correctly
--- upsert_setting_concurrency_safe RPC prevents stale devices overwriting newer data
+-- upsert_setting_concurrency_safe RPC (legacy) and cc_settings_write RPC both prevent
+-- stale devices overwriting newer data; cc_settings_write is the canonical write path

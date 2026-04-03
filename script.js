@@ -319,27 +319,47 @@ if (bookingForm) {
 
         // Also keep settings table in sync for the admin panel (with concurrency check)
         const _expectedTs = localStorage.getItem('cc_cloud_ts:cc_bookings') || null;
-        const { data: rpcData, error: rpcErr } = await window.sb.rpc('upsert_setting_concurrency_safe', {
+        const { data: rpcData, error: rpcErr } = await window.sb.rpc('cc_settings_write', {
           p_key:                 'cc_bookings',
           p_value:               bookings,
           p_expected_updated_at: _expectedTs
         });
         if (rpcErr) {
           console.warn('cc_bookings RPC error:', rpcErr.message);
-        } else if (rpcData && rpcData.conflict) {
-          // Another admin tab wrote more recently to cc_bookings in the settings table.
-          // The new booking was already inserted into event_bookings above, so the admin
-          // will receive it via syncBookingsFromSupabase(). Just update our local timestamp
-          // so our next write uses the correct expected value.
-          console.warn('cc_bookings conflict on booking submit — remote is newer, timestamp synced');
-          if (rpcData.current_updated_at) {
-            localStorage.setItem('cc_cloud_ts:cc_bookings', rpcData.current_updated_at);
+        } else {
+          // cc_settings_write returns a TABLE → use rpcData[0]
+          const rpcResult = Array.isArray(rpcData) ? rpcData[0] : rpcData;
+          if (rpcResult && rpcResult.conflict) {
+            // Another admin tab wrote more recently to cc_bookings.
+            // Merge remote bookings with the new submission (keep both), then retry.
+            console.warn('cc_bookings conflict — merging with remote and retrying');
+            const remoteBookings = Array.isArray(rpcResult.value) ? rpcResult.value : [];
+            const remoteIds = new Set(remoteBookings.map(b => b.id));
+            // Keep all remote bookings, add any local-only ones (merge by id)
+            const merged = [...remoteBookings, ...bookings.filter(b => !remoteIds.has(b.id))];
+            localStorage.setItem('cc_bookings', JSON.stringify(merged));
+            // Retry with the server-confirmed timestamp
+            const retryTs = rpcResult.updated_at || null;
+            const { data: retryData, error: retryErr } = await window.sb.rpc('cc_settings_write', {
+              p_key:                 'cc_bookings',
+              p_value:               merged,
+              p_expected_updated_at: retryTs
+            });
+            if (!retryErr) {
+              const retryResult = Array.isArray(retryData) ? retryData[0] : retryData;
+              if (retryResult && retryResult.updated_at) {
+                localStorage.setItem('cc_cloud_ts:cc_bookings', retryResult.updated_at);
+              }
+              if (retryResult && retryResult.ok) {
+                console.log('✅ Booking merged and saved to Supabase');
+              }
+            }
+          } else if (rpcResult && rpcResult.ok) {
+            if (rpcResult.updated_at) {
+              localStorage.setItem('cc_cloud_ts:cc_bookings', rpcResult.updated_at);
+            }
+            console.log('✅ Booking saved to Supabase');
           }
-        } else if (rpcData && rpcData.success) {
-          if (rpcData.current_updated_at) {
-            localStorage.setItem('cc_cloud_ts:cc_bookings', rpcData.current_updated_at);
-          }
-          console.log('✅ Booking saved to Supabase');
         }
       } catch (err) {
         console.warn('Cloud save failed, local backup used:', err);
