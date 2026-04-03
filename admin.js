@@ -14,35 +14,51 @@ const setLS = (key, val) => localStorage.setItem(key, JSON.stringify(val));
 /* ============================================================
    SUPABASE CLOUD ENGINE
    ============================================================ */
-const CLOUD_ENABLED = (typeof supabase !== 'undefined' && supabase !== null);
+const CLOUD_ENABLED = (typeof window.sb !== 'undefined' && window.sb !== null);
 
 async function syncCloudToLocal() {
   if (!CLOUD_ENABLED) return;
   console.log('🌦️ Syncing Cloud → Local...');
-  const { data, error } = await supabase.from('settings').select('*');
+  const { data, error } = await window.sb.from('settings').select('*');
   if (!error && data) {
-    data.forEach(row => { localStorage.setItem(row.key, JSON.stringify(row.value)); });
+    data.forEach(row => {
+      const tsKey = 'cc_cloud_ts:' + row.key;
+      const remoteTs = row.updated_at || '';
+      const localTs  = localStorage.getItem(tsKey) || '';
+      // Only apply remote value if it is newer than what we already applied
+      if (!localTs || remoteTs >= localTs) {
+        localStorage.setItem(row.key, JSON.stringify(row.value));
+        if (remoteTs) localStorage.setItem(tsKey, remoteTs);
+      }
+    });
   }
 }
 
 async function saveToCloud(key, val) {
   localStorage.setItem(key, JSON.stringify(val));
+  const now = new Date().toISOString();
+  localStorage.setItem('cc_cloud_ts:' + key, now);
   if (!CLOUD_ENABLED) return;
   try {
-    await supabase.from('settings').upsert({ key, value: val, updated_at: new Date().toISOString() });
+    await window.sb.from('settings').upsert({ key, value: val, updated_at: now });
     console.log(`☁️ Synced: ${key}`);
   } catch (e) { console.error('Supabase Save Error:', e); }
 }
 
 function initCloudListeners() {
   if (!CLOUD_ENABLED) return;
-  supabase
+  window.sb
     .channel('admin:settings')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, payload => {
       const row = payload.new;
       if (!row) return;
-      if (JSON.stringify(row.value) !== localStorage.getItem(row.key)) {
+      const tsKey = 'cc_cloud_ts:' + row.key;
+      const remoteTs = row.updated_at || '';
+      const localTs  = localStorage.getItem(tsKey) || '';
+      // Only apply remote update if it is newer than the locally-applied timestamp
+      if (!localTs || remoteTs > localTs) {
         localStorage.setItem(row.key, JSON.stringify(row.value));
+        if (remoteTs) localStorage.setItem(tsKey, remoteTs);
         console.log(`🔄 Remote Update: ${row.key}`);
         const active = $('.sb-link.active');
         if (active && ['inventory','finance','bookings','calendar','contact'].includes(active.dataset.panel)) {
@@ -53,7 +69,7 @@ function initCloudListeners() {
     .subscribe();
 
   // Also listen for new bookings from event_bookings table
-  supabase
+  window.sb
     .channel('admin:event_bookings')
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'event_bookings' }, payload => {
       console.log('📥 New booking received from website:', payload.new);
@@ -65,7 +81,7 @@ function initCloudListeners() {
 /* Pull bookings from event_bookings table and merge with settings */
 async function syncBookingsFromSupabase() {
   if (!CLOUD_ENABLED) return;
-  const { data, error } = await supabase
+  const { data, error } = await window.sb
     .from('event_bookings')
     .select('*')
     .order('submitted_at', { ascending: false });
@@ -101,7 +117,7 @@ async function syncBookingsFromSupabase() {
 async function updateBookingStatusInSupabase(id, status) {
   if (!CLOUD_ENABLED) return;
   try {
-    await supabase.from('event_bookings').update({ status }).eq('id', id);
+    await window.sb.from('event_bookings').update({ status }).eq('id', id);
   } catch (e) { console.warn('Status update failed:', e); }
 }
 
@@ -243,7 +259,7 @@ function attachBookingActions(container) {
         if (!confirm('Delete this booking request?')) return;
         bookings = bookings.filter(b => b.id !== id);
         // Also delete from Supabase
-        if (CLOUD_ENABLED) await supabase.from('event_bookings').delete().eq('id', id);
+        if (CLOUD_ENABLED) await window.sb.from('event_bookings').delete().eq('id', id);
       } else if (action === 'notify-team') {
         notifyTeam(id); return;
       } else {
@@ -277,6 +293,51 @@ $('#clearBookingsBtn').addEventListener('click', () => {
   if (!confirm('Clear ALL booking requests? This cannot be undone.')) return;
   saveToCloud('cc_bookings', []);
   loadBookings(); loadDashboard();
+});
+
+const bulkDeletePendingBtn = $('#bulkDeletePendingBtn');
+if (bulkDeletePendingBtn) bulkDeletePendingBtn.addEventListener('click', async () => {
+  if (!confirm('Delete ALL pending booking requests? This cannot be undone.')) return;
+  let bookings = getLS('cc_bookings', []);
+  const toDelete = bookings.filter(b => b.status === 'pending');
+  bookings = bookings.filter(b => b.status !== 'pending');
+  if (CLOUD_ENABLED) {
+    for (const b of toDelete) {
+      await window.sb.from('event_bookings').delete().eq('id', b.id);
+    }
+  }
+  saveToCloud('cc_bookings', bookings);
+  loadBookings(); loadDashboard(); showToast('🗑️ All Pending bookings deleted.');
+});
+
+const bulkDeleteConfirmedBtn = $('#bulkDeleteConfirmedBtn');
+if (bulkDeleteConfirmedBtn) bulkDeleteConfirmedBtn.addEventListener('click', async () => {
+  if (!confirm('Delete ALL confirmed booking requests? This cannot be undone.')) return;
+  let bookings = getLS('cc_bookings', []);
+  const toDelete = bookings.filter(b => b.status === 'confirmed');
+  bookings = bookings.filter(b => b.status !== 'confirmed');
+  if (CLOUD_ENABLED) {
+    for (const b of toDelete) {
+      await window.sb.from('event_bookings').delete().eq('id', b.id);
+    }
+  }
+  saveToCloud('cc_bookings', bookings);
+  loadBookings(); loadDashboard(); showToast('🗑️ All Confirmed bookings deleted.');
+});
+
+const bulkDeleteRejectedBtn = $('#bulkDeleteRejectedBtn');
+if (bulkDeleteRejectedBtn) bulkDeleteRejectedBtn.addEventListener('click', async () => {
+  if (!confirm('Delete ALL rejected booking requests? This cannot be undone.')) return;
+  let bookings = getLS('cc_bookings', []);
+  const toDelete = bookings.filter(b => b.status === 'rejected');
+  bookings = bookings.filter(b => b.status !== 'rejected');
+  if (CLOUD_ENABLED) {
+    for (const b of toDelete) {
+      await window.sb.from('event_bookings').delete().eq('id', b.id);
+    }
+  }
+  saveToCloud('cc_bookings', bookings);
+  loadBookings(); loadDashboard(); showToast('🗑️ All Rejected bookings deleted.');
 });
 
 /* ============================================================
@@ -339,6 +400,8 @@ $('#adminCalNext').addEventListener('click', () => { adminCalDate.setMonth(admin
    INVENTORY — Pre-populate & Render
    ============================================================ */
 function prePopulateInventory() {
+  // If user has explicitly initialized (or reset) inventory, respect that state
+  const initialized = localStorage.getItem('cc_inventory_initialized');
   let inv = getLS('cc_inventory', []);
   if (inv.length > 0 && (typeof inv[0].stock === 'string' || !('price' in inv[0]))) {
     inv = inv.map(item => ({
@@ -349,7 +412,8 @@ function prePopulateInventory() {
     }));
     saveToCloud('cc_inventory', inv);
   }
-  if (inv.length === 0) {
+  // Only seed defaults on the very first run (never after a user reset)
+  if (inv.length === 0 && !initialized) {
     inv = [
       { name:'Blue Lays',        category:'packets', qty:50, unit:'packs',   min:10, price:10  },
       { name:'Yellow Lays',      category:'packets', qty:50, unit:'packs',   min:10, price:10  },
@@ -366,6 +430,8 @@ function prePopulateInventory() {
     ];
     saveToCloud('cc_inventory', inv);
   }
+  // Mark as initialized so future empty states are intentional resets
+  if (!initialized) localStorage.setItem('cc_inventory_initialized', '1');
   renderInvLog();
 }
 
@@ -437,6 +503,16 @@ function renderInvLog() {
 
 const clearLogBtn = $('#clearInvLogBtn');
 if (clearLogBtn) clearLogBtn.addEventListener('click', () => { if(confirm('Clear the activity log?')){ saveToCloud('cc_inventory_log',[]); renderInvLog(); } });
+
+const resetInventoryBtn = $('#resetInventoryBtn');
+if (resetInventoryBtn) resetInventoryBtn.addEventListener('click', () => {
+  if (!confirm('Reset inventory to COMPLETELY EMPTY? This cannot be undone.')) return;
+  // Save empty arrays to cloud and mark as initialized so defaults are NOT re-seeded
+  saveToCloud('cc_inventory', []);
+  saveToCloud('cc_inventory_log', []);
+  localStorage.setItem('cc_inventory_initialized', '1');
+  renderInventory(); renderInvLog(); showToast('🗑️ Inventory reset to empty.');
+});
 
 window.updateStockQty = (idx, delta) => {
   const items = getLS('cc_inventory', []);
