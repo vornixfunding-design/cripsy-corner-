@@ -45,28 +45,33 @@ async function saveToCloud(key, val) {
   // successful RPC call or after receiving a realtime/fetch update).
   const expectedTs = localStorage.getItem('cc_cloud_ts:' + key) || null;
   try {
-    const { data, error } = await window.sb.rpc('upsert_setting_concurrency_safe', {
+    const { data, error } = await window.sb.rpc('cc_settings_write', {
       p_key:                 key,
       p_value:               val,
       p_expected_updated_at: expectedTs
     });
     if (error) throw error;
 
-    if (data && data.conflict) {
+    // cc_settings_write returns a TABLE; Supabase JS gives us an array → use data[0]
+    const result = Array.isArray(data) ? data[0] : data;
+
+    if (result && result.conflict) {
       // Another device wrote more recently — roll back local value and inform user
       console.warn(`⚡ Conflict on "${key}": remote is newer. Reverting local.`);
-      localStorage.setItem(key, JSON.stringify(data.current_value));
-      if (data.current_updated_at) {
-        localStorage.setItem('cc_cloud_ts:' + key, data.current_updated_at);
+      if ('value' in Object(result) && result.value !== null) {
+        localStorage.setItem(key, JSON.stringify(result.value));
+      }
+      if (result.updated_at) {
+        localStorage.setItem('cc_cloud_ts:' + key, result.updated_at);
       }
       showToast(`⚠️ Data for "${key}" was updated on another device. Your change was not saved — please retry.`, 5000);
       // Refresh active panel so the UI reflects the server state
       const active = $('.sb-link.active');
       if (active) active.click();
-    } else if (data && data.success) {
+    } else if (result && result.ok) {
       // Update local timestamp to the server-returned value
-      if (data.current_updated_at) {
-        localStorage.setItem('cc_cloud_ts:' + key, data.current_updated_at);
+      if (result.updated_at) {
+        localStorage.setItem('cc_cloud_ts:' + key, result.updated_at);
       }
       console.log(`☁️ Synced: ${key}`);
     }
