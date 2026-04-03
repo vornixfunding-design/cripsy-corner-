@@ -36,13 +36,43 @@ async function syncCloudToLocal() {
 
 async function saveToCloud(key, val) {
   localStorage.setItem(key, JSON.stringify(val));
-  const now = new Date().toISOString();
-  localStorage.setItem('cc_cloud_ts:' + key, now);
-  if (!CLOUD_ENABLED) return;
+  if (!CLOUD_ENABLED) {
+    // Offline: just record a local timestamp so ordering works when we reconnect
+    localStorage.setItem('cc_cloud_ts:' + key, new Date().toISOString());
+    return;
+  }
+  // Read the last server-acknowledged timestamp for this key (set after a
+  // successful RPC call or after receiving a realtime/fetch update).
+  const expectedTs = localStorage.getItem('cc_cloud_ts:' + key) || null;
   try {
-    await window.sb.from('settings').upsert({ key, value: val, updated_at: now });
-    console.log(`☁️ Synced: ${key}`);
-  } catch (e) { console.error('Supabase Save Error:', e); }
+    const { data, error } = await window.sb.rpc('upsert_setting_concurrency_safe', {
+      p_key:                 key,
+      p_value:               val,
+      p_expected_updated_at: expectedTs
+    });
+    if (error) throw error;
+
+    if (data && data.conflict) {
+      // Another device wrote more recently — roll back local value and inform user
+      console.warn(`⚡ Conflict on "${key}": remote is newer. Reverting local.`);
+      localStorage.setItem(key, JSON.stringify(data.current_value));
+      if (data.current_updated_at) {
+        localStorage.setItem('cc_cloud_ts:' + key, data.current_updated_at);
+      }
+      showToast(`⚠️ Data for "${key}" was updated on another device. Your change was not saved — please retry.`, 5000);
+      // Refresh active panel so the UI reflects the server state
+      const active = $('.sb-link.active');
+      if (active) active.click();
+    } else if (data && data.success) {
+      // Update local timestamp to the server-returned value
+      if (data.current_updated_at) {
+        localStorage.setItem('cc_cloud_ts:' + key, data.current_updated_at);
+      }
+      console.log(`☁️ Synced: ${key}`);
+    }
+  } catch (e) {
+    console.error('Supabase Save Error:', e);
+  }
 }
 
 function initCloudListeners() {
