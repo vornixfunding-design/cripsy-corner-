@@ -10,27 +10,21 @@
   <title>Cripsy Corner – From Packet to Perfect Snack 🌶️</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Nunito:wght@400;600;700;800;900&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Syne:wght@600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 
   <!-- 🐘 Supabase SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-  <!-- Supabase Configuration -->
   <script>
     const supabaseUrl = "https://dvybbidcozjrfhrzafxi.supabase.co";
     const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2eWJiaWRjb3pqcmZocnphZnhpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5Nzg2OTgsImV4cCI6MjA5MDU1NDY5OH0.bU1Xp_BWoY4J9niJxYd7vrIIN1hFfEecNoXKjYk9Qm0";
-
-    // Use window.sb to avoid colliding with the SDK's own "supabase" global
     window.sb = null;
     try {
       const _sdk = window.supabase || window.supabasejs;
       if (_sdk && supabaseUrl && supabaseKey) {
         window.sb = _sdk.createClient(supabaseUrl, supabaseKey);
       }
-    } catch (e) {
-      console.error("Supabase init failed:", e);
-    }
+    } catch (e) { console.error("Supabase init failed:", e); }
   </script>
 </head>
 <body>
@@ -68,318 +62,74 @@
       </button>
       <ul class="nav-links" id="navLinks" role="navigation">
         <li><a href="#home" class="nav-link active">Home</a></li>
-        <li><a href="#about" class="nav-link">About</a></li>
-        <li><a href="#how-it-works" class="nav-link">How It Works</a></li>
-        <li><a href="#pricing" class="nav-link">Pricing</a></li>
+        <li><a href="#book" class="nav-link">Book Us</a></li>
         <li><a href="#availability" class="nav-link">Availability</a></li>
         <li><a href="#gallery" class="nav-link">Gallery</a></li>
-        <li><a href="#book" class="nav-link">Book Us</a></li>
+        <li><a href="#how-it-works" class="nav-link">How It Works</a></li>
         <li><a href="#contact" class="nav-link">Contact</a></li>
       </ul>
     </div>
   </nav>
 
-  <!-- ===== HOME / HERO SECTION ===== -->
+  <!-- ===== HERO SECTION ===== -->
   <section id="home" class="hero-section">
-    <div class="hero-bg-gradient"></div>
-    <div class="hero-container">
+    <canvas id="heroCanvas" class="hero-canvas" aria-hidden="true"></canvas>
+    <div class="hero-orb hero-orb-1"></div>
+    <div class="hero-orb hero-orb-2"></div>
+    <div class="hero-orb hero-orb-3"></div>
 
-      <!-- Hero Logo Display -->
-      <div class="hero-stage">
-        <div class="hero-logo-display">
-          <div class="hero-logo-glow"></div>
-
-          <!-- Real logo image — shows automatically when img/logo.png exists -->
-          <img src="img/logo.png" alt="Cripsy Corner Logo" class="hero-logo-img"
-            onerror="this.style.display='none';document.getElementById('heroLogoFallback').style.display='flex'" />
-
-          <!-- Fallback text logo (shows only if logo.png not found) -->
-          <div class="hero-logo-text-fallback" id="heroLogoFallback" style="display:none">
-            <div class="hero-logo-brand">CRIPSY<br>CORNER</div>
-            <div class="hero-logo-tagline-small">From Packet to Perfect Snack</div>
-            <div class="hero-logo-icon-row">🌶️ 🧅 🌽 🥒</div>
+    <div class="hero-inner">
+      <!-- LEFT: 3D Logo -->
+      <div class="hero-logo-col">
+        <div class="hero-logo-scene">
+          <div class="hero-logo-3d" id="heroLogo3d">
+            <img src="img/logo.png" alt="Cripsy Corner Logo" class="hero-logo-img-3d"
+              onerror="this.style.display='none';document.getElementById('heroLogoFb').style.display='flex'" />
+            <div id="heroLogoFb" class="hero-logo-fb" style="display:none">🌶️</div>
+            <div class="logo-shine"></div>
           </div>
-
-          <!-- Floating food items around logo -->
-          <div class="food-orbit" aria-hidden="true">
-            <span class="food-orb">🌶️</span>
-            <span class="food-orb">🧅</span>
-            <span class="food-orb">🌽</span>
-            <span class="food-orb">🥒</span>
-            <span class="food-orb">🫙</span>
-            <span class="food-orb">✨</span>
+          <div class="logo-ground-shadow"></div>
+          <div class="logo-orbit-ring" aria-hidden="true">
+            <span class="orb-item" style="--i:0">🌶️</span>
+            <span class="orb-item" style="--i:1">🧅</span>
+            <span class="orb-item" style="--i:2">🌽</span>
+            <span class="orb-item" style="--i:3">🥒</span>
+            <span class="orb-item" style="--i:4">🫙</span>
+            <span class="orb-item" style="--i:5">✨</span>
           </div>
         </div>
       </div>
 
-      <!-- Hero Text -->
-      <div class="hero-text" id="heroText">
-        <div class="hero-badge">🌶️ Live Snack Experience — Events Only</div>
-        <h1 class="hero-headline">
-          <span class="hero-brand-line1">CRIPSY</span>
-          <span class="hero-brand-line2">CORNER</span>
-        </h1>
-        <p class="hero-brand-subheading">
-          From Packet to Perfect Snack
-        </p>
-        <p class="hero-brand-desc">
-          We don’t sell chips. We create a live snack experience.
-        </p>
-        <div class="hero-buttons">
-          <a href="#book" class="btn btn-primary" id="btnBook">
-            <span class="btn-icon">📋</span> Book Us For Your Event
-          </a>
-          <a href="#gallery" class="btn btn-secondary" id="btnGallery">
-            <span class="btn-icon">📸</span> View Gallery
-          </a>
+      <!-- RIGHT: Brand Name + CTA -->
+      <div class="hero-brand-col">
+        <div class="hero-eyebrow">
+          <span class="eyebrow-pip"></span>
+          Live Snack Experience · Events Only
+          <span class="eyebrow-pip"></span>
         </div>
-        <div class="hero-stats">
-          <div class="stat">
-            <span class="stat-num" data-target="5">5+</span>
-            <span class="stat-label">Events Done</span>
-          </div>
-          <div class="stat-divider"></div>
-          <div class="stat">
-            <span class="stat-num">100%</span>
-            <span class="stat-label">Live Experience</span>
-          </div>
-          <div class="stat-divider"></div>
-          <div class="stat">
-            <span class="stat-num">🔥</span>
-            <span class="stat-label">Fun Guaranteed</span>
-          </div>
+        <h1 class="hero-brand-name">
+          <span class="hbn-cripsy">CRIPSY</span>
+          <span class="hbn-corner">CORNER</span>
+        </h1>
+        <p class="hero-tagline">From Packet to Perfect Snack</p>
+        <div class="hero-actions">
+          <a href="#gallery" class="hero-btn hero-btn-glass" id="btnGallery">
+            <span>📸</span> View Gallery
+          </a>
+          <a href="#book" class="hero-btn hero-btn-fire" id="btnBook">
+            <span>📋</span> Book Our Stall
+          </a>
         </div>
       </div>
     </div>
-    <div class="hero-scroll-indicator">
-      <div class="scroll-dot"></div>
+
+    <div class="hero-scroll-hint">
+      <div class="scroll-track"><div class="scroll-ball"></div></div>
       <span>Scroll Down</span>
     </div>
   </section>
 
-  <!-- ===== ABOUT SECTION ===== -->
-  <section id="about" class="about-section">
-    <div class="section-container">
-      <div class="about-grid">
-        <div class="about-visual reveal-left">
-          <div class="about-card-big">
-            <div class="about-emoji-wall">
-              <span>🧅</span><span>🌽</span><span>🥒</span>
-              <span>🌶️</span><span>🫙</span><span>✨</span>
-              <span>🎉</span><span>🍟</span><span>🔥</span>
-            </div>
-            <div class="about-packet-center">
-              <div class="about-packet-anim">
-                <div class="abt-pkt-label">CC</div>
-              </div>
-            </div>
-          </div>
-          <div class="about-badge-float badge-yellow">🎓 College Fests</div>
-          <div class="about-badge-float badge-orange">🎂 Birthday Parties</div>
-          <div class="about-badge-float badge-red">🏢 Corporate Events</div>
-        </div>
-        <div class="about-content reveal-right">
-          <div class="section-tag">About Us</div>
-          <h2 class="section-title">It's Not Just Food —<br /><span class="highlight">It's An Experience!</span></h2>
-          <p class="about-text">Cripsy Corner is a live snack mixing experience where we turn a simple chips packet into a delicious loaded snack. Customer chooses their favorite packet, and we open it, add fresh veggies, sauces, and our special masalas, mix it live, and serve it in the same packet.</p>
-          <p class="about-text" id="aboutTeamText">Cripsy Corner is perfect for college fests, school events, birthday parties, exhibitions, and corporate events. Started by three college students, Cripsy Corner is not just food — it's an experience.</p>
-          <div class="about-highlights">
-            <div class="about-highlight-item">
-              <span class="hl-icon">🌟</span>
-              <div>
-                <strong>Live Experience</strong>
-                <p>Watch your snack being made right in front of you — that's the magic!</p>
-              </div>
-            </div>
-            <div class="about-highlight-item">
-              <span class="hl-icon">🌿</span>
-              <div>
-                <strong>Fresh Ingredients</strong>
-                <p>Fresh veggies, premium sauces, and our special in-house masalas.</p>
-              </div>
-            </div>
-            <div class="about-highlight-item">
-              <span class="hl-icon">📦</span>
-              <div>
-                <strong>Served in the Packet</strong>
-                <p>No bowls, no plates — unique packet serving style that everyone loves!</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ===== HOW IT WORKS ===== -->
-  <section id="how-it-works" class="hiw-section">
-    <div class="section-container">
-      <div class="section-header reveal-up">
-        <div class="section-tag">Step by Step</div>
-        <h2 class="section-title">How It <span class="highlight">Works</span></h2>
-        <p class="section-subtitle">Six simple steps from plain packet to magic snack</p>
-      </div>
-      <div class="hiw-grid">
-        <div class="hiw-step reveal-up" style="--delay:0s">
-          <div class="hiw-step-num">01</div>
-          <div class="hiw-icon-wrap"><div class="hiw-icon">🛍️</div></div>
-          <h3>Pick Your Packet</h3>
-          <p>Customer chooses their favorite chips packet — their brand, their call!</p>
-        </div>
-        <div class="hiw-step reveal-up" style="--delay:0.1s">
-          <div class="hiw-step-num">02</div>
-          <div class="hiw-icon-wrap"><div class="hiw-icon">✂️</div></div>
-          <h3>We Open It</h3>
-          <p>We carefully open the top of the packet — this becomes your serving container!</p>
-        </div>
-        <div class="hiw-step reveal-up" style="--delay:0.2s">
-          <div class="hiw-step-num">03</div>
-          <div class="hiw-icon-wrap"><div class="hiw-icon">🥗</div></div>
-          <h3>Add Fresh Veggies</h3>
-          <p>We load it with fresh chopped onions, cucumber, sweet corn, and more!</p>
-        </div>
-        <div class="hiw-step reveal-up" style="--delay:0.3s">
-          <div class="hiw-step-num">04</div>
-          <div class="hiw-icon-wrap"><div class="hiw-icon">🫙</div></div>
-          <h3>Add Sauces &amp; Masala</h3>
-          <p>Drizzle of mayo, schezwan sauce, and a generous sprinkle of our secret masala!</p>
-        </div>
-        <div class="hiw-step reveal-up" style="--delay:0.4s">
-          <div class="hiw-step-num">05</div>
-          <div class="hiw-icon-wrap"><div class="hiw-icon shake-anim">🤝</div></div>
-          <h3>We Mix It</h3>
-          <p>The magic moment — we shake and toss everything inside the packet, live!</p>
-        </div>
-        <div class="hiw-step reveal-up" style="--delay:0.5s">
-          <div class="hiw-step-num">06</div>
-          <div class="hiw-icon-wrap glow-icon"><div class="hiw-icon">🎉</div></div>
-          <h3>Served In The Packet</h3>
-          <p>Your loaded snack is ready — no bowl, no plate, just pure packet perfection!</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ===== PRICING SECTION ===== -->
-  <section id="pricing" class="pricing-section">
-    <div class="pricing-bg-blob"></div>
-    <div class="section-container">
-      <div class="section-header reveal-up">
-        <div class="section-tag">Event Stall Bookings Only</div>
-        <h2 class="section-title">What's the <span class="highlight">Deal?</span></h2>
-        <p class="section-subtitle">We don't take single orders — we set up our full stall at your event!</p>
-      </div>
-      <div class="pricing-event-wrap">
-        <div class="pricing-card main-card reveal-up">
-          <div class="pricing-card-top">
-            <div class="pricing-emoji">🎪</div>
-            <div class="pricing-name">Event Stall Booking</div>
-            <div class="pricing-badge">Stall Bookings Only</div>
-          </div>
-          <div class="price-display">
-            <span class="price-contact">Contact Us</span>
-            <span class="price-sub-note">for event pricing</span>
-          </div>
-          <div class="price-per-pack-note">
-            💰 ₹150 per packet served at your event
-          </div>
-          <p class="event-pricing-desc">We set up our full Cripsy Corner live stall at your event. Custom packages are available based on your event details:</p>
-          <ul class="event-pricing-list">
-            <li>📅 Event duration &amp; date</li>
-            <li>👥 Expected number of people</li>
-            <li>📍 Event location &amp; city</li>
-            <li>🎭 Type of event</li>
-          </ul>
-          <div class="event-types-pill-row">
-            <span class="epill">🎓 College Fest</span>
-            <span class="epill">🏫 School Event</span>
-            <span class="epill">🎂 Birthday Party</span>
-            <span class="epill">🏢 Corporate Event</span>
-            <span class="epill">🎪 Exhibition</span>
-            <span class="epill">🎉 Other Events</span>
-          </div>
-          <a href="#book" class="btn btn-primary btn-full">Book Our Stall For Your Event 🚀</a>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ===== AVAILABILITY CALENDAR ===== -->
-  <section id="availability" class="availability-section">
-    <div class="section-container">
-      <div class="section-header reveal-up">
-        <div class="section-tag">Check Our Schedule</div>
-        <h2 class="section-title">Event <span class="highlight">Availability</span></h2>
-        <p class="section-subtitle">See when we're available and booked — plan your event accordingly!</p>
-      </div>
-      <div class="cal-wrapper reveal-up">
-        <div class="cal-header">
-          <button class="cal-nav-btn" id="calPrev" aria-label="Previous month">&#8249;</button>
-          <div class="cal-month-label" id="calMonthLabel">Month Year</div>
-          <button class="cal-nav-btn" id="calNext" aria-label="Next month">&#8250;</button>
-        </div>
-        <div class="cal-grid">
-          <div class="cal-weekdays">
-            <div class="cal-weekday">Sun</div>
-            <div class="cal-weekday">Mon</div>
-            <div class="cal-weekday">Tue</div>
-            <div class="cal-weekday">Wed</div>
-            <div class="cal-weekday">Thu</div>
-            <div class="cal-weekday">Fri</div>
-            <div class="cal-weekday">Sat</div>
-          </div>
-          <div class="cal-days" id="calDays"></div>
-        </div>
-        <div class="cal-legend">
-          <div class="cal-legend-item"><div class="cal-legend-dot dot-available"></div> Available</div>
-          <div class="cal-legend-item"><div class="cal-legend-dot dot-booked"></div> Booked</div>
-          <div class="cal-legend-item"><div class="cal-legend-dot dot-today"></div> Today</div>
-        </div>
-      </div>
-      <p style="text-align:center;margin-top:20px;font-size:13px;color:var(--text-muted);">
-        📩 Don't see your date? <a href="#book" style="color:var(--orange);font-weight:700;">Send us a booking request</a> and we'll confirm availability!
-      </p>
-    </div>
-  </section>
-
-  <!-- ===== GALLERY SECTION ===== -->
-  <section id="gallery" class="gallery-section">
-    <div class="section-container">
-      <div class="section-header reveal-up">
-        <div class="section-tag">Our Story in Pictures</div>
-        <h2 class="section-title">The <span class="highlight">Gallery</span></h2>
-        <p class="section-subtitle">Moments, memories, and lots of delicious packets!</p>
-      </div>
-      <div class="gallery-grid" id="galleryGrid">
-        <div class="gallery-item gi-large reveal-up" style="--delay:0s">
-          <img src="img/gallery_stall_event.png" alt="Cripsy Corner stall at a college fest" loading="lazy" />
-          <div class="gallery-overlay"><span class="gallery-tag">College Fest</span></div>
-        </div>
-        <div class="gallery-item reveal-up" style="--delay:0.1s">
-          <img src="img/gallery_food_snack.png" alt="Loaded crispy snack packet" loading="lazy" />
-          <div class="gallery-overlay"><span class="gallery-tag">The Loaded Packet 🔥</span></div>
-        </div>
-        <div class="gallery-item reveal-up" style="--delay:0.2s">
-          <img src="img/gallery_team_stall.png" alt="Cripsy Corner team at stall" loading="lazy" />
-          <div class="gallery-overlay"><span class="gallery-tag">Our Team ❤️</span></div>
-        </div>
-        <div class="gallery-item reveal-up" style="--delay:0.3s">
-          <img src="img/gallery_mixing_live.png" alt="Live mixing of snack" loading="lazy" />
-          <div class="gallery-overlay"><span class="gallery-tag">Live Mixing 🎭</span></div>
-        </div>
-        <div class="gallery-item gi-large reveal-up" style="--delay:0.4s">
-          <img src="img/gallery_crowd.png" alt="Happy crowd at Cripsy Corner stall" loading="lazy" />
-          <div class="gallery-overlay"><span class="gallery-tag">Happy Customers 😊</span></div>
-        </div>
-        <div class="gallery-item reveal-up" style="--delay:0.5s">
-          <img src="img/gallery_birthday_event.png" alt="Cripsy Corner at a birthday party" loading="lazy" />
-          <div class="gallery-overlay"><span class="gallery-tag">Birthday Parties 🎂</span></div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ===== BOOK US SECTION ===== -->
+  <!-- ===== BOOK US SECTION (moved up — right after hero) ===== -->
   <section id="book" class="book-section">
     <div class="book-bg-pattern"></div>
     <div class="section-container">
@@ -471,8 +221,8 @@
               </div>
             </div>
             <div class="form-group">
-              <label for="stallFee">Event Stall Fee (₹) <span style="font-size: 11px; font-weight: normal; color: var(--text-muted);">(optional)</span></label>
-              <input type="number" id="stallFee" name="stallFee" placeholder="How much fee event is asking?">
+              <label for="stallFee">Event Stall Fee (₹) <span style="font-size:11px;font-weight:normal;color:var(--text-muted)">(optional)</span></label>
+              <input type="number" id="stallFee" name="stallFee" placeholder="How much fee event is asking?" />
             </div>
             <div class="form-group">
               <label for="message">Additional Message</label>
@@ -490,6 +240,134 @@
       </div>
     </div>
   </section>
+
+  <!-- ===== AVAILABILITY CALENDAR ===== -->
+  <section id="availability" class="availability-section">
+    <div class="section-container">
+      <div class="section-header reveal-up">
+        <div class="section-tag">Check Our Schedule</div>
+        <h2 class="section-title">Event <span class="highlight">Availability</span></h2>
+        <p class="section-subtitle">See when we're available and booked — plan your event accordingly!</p>
+      </div>
+      <div class="cal-wrapper reveal-up">
+        <div class="cal-header">
+          <button class="cal-nav-btn" id="calPrev" aria-label="Previous month">&#8249;</button>
+          <div class="cal-month-label" id="calMonthLabel">Month Year</div>
+          <button class="cal-nav-btn" id="calNext" aria-label="Next month">&#8250;</button>
+        </div>
+        <div class="cal-grid">
+          <div class="cal-weekdays">
+            <div class="cal-weekday">Sun</div>
+            <div class="cal-weekday">Mon</div>
+            <div class="cal-weekday">Tue</div>
+            <div class="cal-weekday">Wed</div>
+            <div class="cal-weekday">Thu</div>
+            <div class="cal-weekday">Fri</div>
+            <div class="cal-weekday">Sat</div>
+          </div>
+          <div class="cal-days" id="calDays"></div>
+        </div>
+        <div class="cal-legend">
+          <div class="cal-legend-item"><div class="cal-legend-dot dot-available"></div> Available</div>
+          <div class="cal-legend-item"><div class="cal-legend-dot dot-booked"></div> Booked</div>
+          <div class="cal-legend-item"><div class="cal-legend-dot dot-today"></div> Today</div>
+        </div>
+      </div>
+      <p style="text-align:center;margin-top:20px;font-size:13px;color:var(--text-muted);">
+        📩 Don't see your date? <a href="#book" style="color:var(--orange);font-weight:700;">Send us a booking request</a> and we'll confirm availability!
+      </p>
+    </div>
+  </section>
+
+  <!-- ===== GALLERY SECTION ===== -->
+  <section id="gallery" class="gallery-section">
+    <div class="section-container">
+      <div class="section-header reveal-up">
+        <div class="section-tag">Our Story in Pictures</div>
+        <h2 class="section-title">The <span class="highlight">Gallery</span></h2>
+        <p class="section-subtitle">Moments, memories, and lots of delicious packets!</p>
+      </div>
+      <div class="gallery-grid" id="galleryGrid">
+        <div class="gallery-item gi-large reveal-up" style="--delay:0s">
+          <img src="img/gallery_stall_event.png" alt="Cripsy Corner stall at a college fest" loading="lazy" />
+          <div class="gallery-overlay"><span class="gallery-tag">College Fest</span></div>
+        </div>
+        <div class="gallery-item reveal-up" style="--delay:0.1s">
+          <img src="img/gallery_food_snack.png" alt="Loaded crispy snack packet" loading="lazy" />
+          <div class="gallery-overlay"><span class="gallery-tag">The Loaded Packet 🔥</span></div>
+        </div>
+        <div class="gallery-item reveal-up" style="--delay:0.2s">
+          <img src="img/gallery_team_stall.png" alt="Cripsy Corner team at stall" loading="lazy" />
+          <div class="gallery-overlay"><span class="gallery-tag">Our Team ❤️</span></div>
+        </div>
+        <div class="gallery-item reveal-up" style="--delay:0.3s">
+          <img src="img/gallery_mixing_live.png" alt="Live mixing of snack" loading="lazy" />
+          <div class="gallery-overlay"><span class="gallery-tag">Live Mixing 🎭</span></div>
+        </div>
+        <div class="gallery-item gi-large reveal-up" style="--delay:0.4s">
+          <img src="img/gallery_crowd.png" alt="Happy crowd at Cripsy Corner stall" loading="lazy" />
+          <div class="gallery-overlay"><span class="gallery-tag">Happy Customers 😊</span></div>
+        </div>
+        <div class="gallery-item reveal-up" style="--delay:0.5s">
+          <img src="img/gallery_birthday_event.png" alt="Cripsy Corner at a birthday party" loading="lazy" />
+          <div class="gallery-overlay"><span class="gallery-tag">Birthday Parties 🎂</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+
+  <!-- ===== HOW IT WORKS ===== -->
+  <section id="how-it-works" class="hiw-section">
+    <div class="section-container">
+      <div class="section-header reveal-up">
+        <div class="section-tag">Step by Step</div>
+        <h2 class="section-title">How It <span class="highlight">Works</span></h2>
+        <p class="section-subtitle">Six simple steps from plain packet to magic snack</p>
+      </div>
+      <div class="hiw-grid">
+        <div class="hiw-step reveal-up" style="--delay:0s">
+          <div class="hiw-step-num">01</div>
+          <div class="hiw-icon-wrap"><div class="hiw-icon">🛍️</div></div>
+          <h3>Pick Your Packet</h3>
+          <p>Customer chooses their favorite chips packet — their brand, their call!</p>
+        </div>
+        <div class="hiw-step reveal-up" style="--delay:0.1s">
+          <div class="hiw-step-num">02</div>
+          <div class="hiw-icon-wrap"><div class="hiw-icon">✂️</div></div>
+          <h3>We Open It</h3>
+          <p>We carefully open the top of the packet — this becomes your serving container!</p>
+        </div>
+        <div class="hiw-step reveal-up" style="--delay:0.2s">
+          <div class="hiw-step-num">03</div>
+          <div class="hiw-icon-wrap"><div class="hiw-icon">🥗</div></div>
+          <h3>Add Fresh Veggies</h3>
+          <p>We load it with fresh chopped onions, cucumber, sweet corn, and more!</p>
+        </div>
+        <div class="hiw-step reveal-up" style="--delay:0.3s">
+          <div class="hiw-step-num">04</div>
+          <div class="hiw-icon-wrap"><div class="hiw-icon">🫙</div></div>
+          <h3>Add Sauces &amp; Masala</h3>
+          <p>Drizzle of mayo, schezwan sauce, and a generous sprinkle of our secret masala!</p>
+        </div>
+        <div class="hiw-step reveal-up" style="--delay:0.4s">
+          <div class="hiw-step-num">05</div>
+          <div class="hiw-icon-wrap"><div class="hiw-icon shake-anim">🤝</div></div>
+          <h3>We Mix It</h3>
+          <p>The magic moment — we shake and toss everything inside the packet, live!</p>
+        </div>
+        <div class="hiw-step reveal-up" style="--delay:0.5s">
+          <div class="hiw-step-num">06</div>
+          <div class="hiw-icon-wrap glow-icon"><div class="hiw-icon">🎉</div></div>
+          <h3>Served In The Packet</h3>
+          <p>Your loaded snack is ready — no bowl, no plate, just pure packet perfection!</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
 
   <!-- ===== CONTACT SECTION ===== -->
   <section id="contact" class="contact-section">
@@ -542,12 +420,10 @@
       <p class="footer-tagline">"From Packet to Perfect Snack"</p>
       <div class="footer-links">
         <a href="#home">Home</a>
-        <a href="#about">About</a>
-        <a href="#how-it-works">How It Works</a>
-        <a href="#pricing">Pricing</a>
+        <a href="#book">Book Us</a>
         <a href="#availability">Availability</a>
         <a href="#gallery">Gallery</a>
-        <a href="#book">Book Us</a>
+        <a href="#how-it-works">How It Works</a>
         <a href="#contact">Contact</a>
       </div>
       <div class="footer-admin-link">
