@@ -140,15 +140,18 @@ INSERT INTO public.settings (key, value) VALUES ('cc_admin_pwd', '"admin123"')
 -- ----------------------------------------------------------------
 -- 11. ENABLE REALTIME on all critical tables
 -- ----------------------------------------------------------------
-ALTER PUBLICATION supabase_realtime ADD TABLE public.bookings;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.booked_dates;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.inventory;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.inventory_log;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.finance_accounts;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.finance_transactions;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.contact_info;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.gallery;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.settings;
+-- SET TABLE replaces the entire list for the publication, 
+-- making it perfectly safe to re-run without "already exists" errors.
+ALTER PUBLICATION supabase_realtime SET TABLE 
+    public.bookings, 
+    public.booked_dates, 
+    public.inventory, 
+    public.inventory_log, 
+    public.finance_accounts, 
+    public.finance_transactions, 
+    public.contact_info, 
+    public.gallery, 
+    public.settings;
 
 -- ----------------------------------------------------------------
 -- 12. STORAGE BUCKET — For gallery media uploads
@@ -164,15 +167,18 @@ VALUES (
 ) ON CONFLICT (id) DO NOTHING;
 
 -- Allow anonymous uploads to the gallery bucket (public access)
-CREATE POLICY IF NOT EXISTS "Allow public uploads to gallery"
+DROP POLICY IF EXISTS "Allow public uploads to gallery" ON storage.objects;
+CREATE POLICY "Allow public uploads to gallery"
     ON storage.objects FOR INSERT TO anon
     WITH CHECK (bucket_id = 'gallery');
 
-CREATE POLICY IF NOT EXISTS "Allow public reads from gallery"
+DROP POLICY IF EXISTS "Allow public reads from gallery" ON storage.objects;
+CREATE POLICY "Allow public reads from gallery"
     ON storage.objects FOR SELECT TO anon
     USING (bucket_id = 'gallery');
 
-CREATE POLICY IF NOT EXISTS "Allow public deletes from gallery"
+DROP POLICY IF EXISTS "Allow public deletes from gallery" ON storage.objects;
+CREATE POLICY "Allow public deletes from gallery"
     ON storage.objects FOR DELETE TO anon
     USING (bucket_id = 'gallery');
 
