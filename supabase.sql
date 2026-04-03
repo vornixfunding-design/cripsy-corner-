@@ -96,7 +96,125 @@ BEGIN
   END IF;
 END $$;
 
+-- ============================================================
+-- 9. Optimistic Concurrency Control RPC
+--    Prevents stale devices from overwriting newer cloud data.
+--
+--    Usage (from JS):
+--      const { data } = await window.sb.rpc('upsert_setting_concurrency_safe', {
+--        p_key: 'cc_inventory',
+--        p_value: { ... },
+--        p_expected_updated_at: '2024-01-01T00:00:00.000Z'   -- or null
+--      });
+--      // data: { success, conflict, current_updated_at, current_value }
+--
+--    Behavior:
+--      • Row does not exist → INSERT and return success=true.
+--      • Row exists, p_expected_updated_at is NULL → conflict=true (client
+--          must sync first before it can write).
+--      • Row exists, updated_at ≠ p_expected_updated_at → conflict=true
+--          (another device wrote more recently; client must refresh).
+--      • Row exists, updated_at = p_expected_updated_at → UPDATE value +
+--          bump updated_at=now() and return success=true with new timestamp.
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION upsert_setting_concurrency_safe(
+  p_key                TEXT,
+  p_value              JSONB,
+  p_expected_updated_at TIMESTAMPTZ DEFAULT NULL
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_row          settings%ROWTYPE;
+  v_now          TIMESTAMPTZ := NOW();
+  v_result       JSONB;
+BEGIN
+  -- Try to fetch existing row
+  SELECT * INTO v_row FROM settings WHERE key = p_key;
+
+  IF NOT FOUND THEN
+    -- Row does not exist → insert it
+    INSERT INTO settings (key, value, updated_at)
+    VALUES (p_key, p_value, v_now);
+
+    v_result := jsonb_build_object(
+      'success',          true,
+      'conflict',         false,
+      'current_updated_at', v_now,
+      'current_value',    p_value
+    );
+
+  ELSIF p_expected_updated_at IS NULL THEN
+    -- Client does not know the current timestamp → reject to force a sync
+    v_result := jsonb_build_object(
+      'success',          false,
+      'conflict',         true,
+      'current_updated_at', v_row.updated_at,
+      'current_value',    v_row.value
+    );
+
+  ELSIF v_row.updated_at != p_expected_updated_at THEN
+    -- Timestamps do not match → stale client, return current state
+    v_result := jsonb_build_object(
+      'success',          false,
+      'conflict',         true,
+      'current_updated_at', v_row.updated_at,
+      'current_value',    v_row.value
+    );
+
+  ELSE
+    -- Timestamps match → safe to update
+    UPDATE settings
+    SET value = p_value, updated_at = v_now
+    WHERE key = p_key;
+
+    v_result := jsonb_build_object(
+      'success',          true,
+      'conflict',         false,
+      'current_updated_at', v_now,
+      'current_value',    p_value
+    );
+  END IF;
+
+  RETURN v_result;
+END;
+$$;
+
+-- ============================================================
+-- 10. RLS for the RPC function
+--
+--  SCENARIO A — RLS is OFF on the settings table:
+--    No extra steps needed. The function above already works.
+--    (RLS is currently ENABLED in this script; if you disabled it,
+--     the policies below are ignored but harmless.)
+--
+--  SCENARIO B — RLS is ON (current setup in this script):
+--    The function is declared SECURITY DEFINER, so it runs with the
+--    privileges of the function owner (usually postgres / service role)
+--    and bypasses RLS on the settings table internally.
+--    Anon/public callers can call the function as long as EXECUTE
+--    privilege is granted, which Supabase grants by default to the
+--    anon role for functions created in the public schema.
+--
+--    If your project has restricted EXECUTE on functions, run:
+--      GRANT EXECUTE ON FUNCTION upsert_setting_concurrency_safe(TEXT,JSONB,TIMESTAMPTZ)
+--        TO anon, authenticated;
+--
+-- ⚠️  SECURITY TRADE-OFF WARNING ⚠️
+--    This app uses the Supabase anon (public) key embedded in client-side
+--    JavaScript and does NOT use Supabase Auth.  Anyone who inspects the
+--    page source can read and modify settings data directly via the
+--    Supabase API.  The optimistic concurrency RPC prevents accidental
+--    overwrites between admin tabs/devices but does NOT provide security
+--    against a malicious actor who finds the anon key.
+--    For a production system, replace the anon key with server-side auth.
+-- ============================================================
+
 -- Done! ✅
 -- event_bookings table is ready for booking form submissions
 -- settings table handles: inventory, gallery, calendar, contact, finance
 -- updated_at trigger ensures last-write-wins sync works correctly
+-- upsert_setting_concurrency_safe RPC prevents stale devices overwriting newer data

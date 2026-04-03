@@ -317,13 +317,30 @@ if (bookingForm) {
         });
         if (insErr) console.warn('event_bookings insert:', insErr.message);
 
-        // Also keep settings table in sync for the admin panel
-        const _nowTs = new Date().toISOString();
-        await window.sb.from('settings').upsert({
-          key: 'cc_bookings', value: bookings, updated_at: _nowTs
+        // Also keep settings table in sync for the admin panel (with concurrency check)
+        const _expectedTs = localStorage.getItem('cc_cloud_ts:cc_bookings') || null;
+        const { data: rpcData, error: rpcErr } = await window.sb.rpc('upsert_setting_concurrency_safe', {
+          p_key:                 'cc_bookings',
+          p_value:               bookings,
+          p_expected_updated_at: _expectedTs
         });
-        localStorage.setItem('cc_cloud_ts:cc_bookings', _nowTs);
-        console.log('✅ Booking saved to Supabase');
+        if (rpcErr) {
+          console.warn('cc_bookings RPC error:', rpcErr.message);
+        } else if (rpcData && rpcData.conflict) {
+          // Another admin tab wrote more recently to cc_bookings in the settings table.
+          // The new booking was already inserted into event_bookings above, so the admin
+          // will receive it via syncBookingsFromSupabase(). Just update our local timestamp
+          // so our next write uses the correct expected value.
+          console.warn('cc_bookings conflict on booking submit — remote is newer, timestamp synced');
+          if (rpcData.current_updated_at) {
+            localStorage.setItem('cc_cloud_ts:cc_bookings', rpcData.current_updated_at);
+          }
+        } else if (rpcData && rpcData.success) {
+          if (rpcData.current_updated_at) {
+            localStorage.setItem('cc_cloud_ts:cc_bookings', rpcData.current_updated_at);
+          }
+          console.log('✅ Booking saved to Supabase');
+        }
       } catch (err) {
         console.warn('Cloud save failed, local backup used:', err);
       }
